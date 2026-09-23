@@ -5,6 +5,7 @@
 import { spawn } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import { connect } from 'node:net'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { hookDecider, hintFor, statePaths, type HookReply, type HookRequest } from './hook.ts'
 
@@ -51,8 +52,9 @@ export async function main(): Promise<void> {
       return inProcess(input.transcript_path ?? '', paths, request)
     })
     if (reply.hint) process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: request.event, additionalContext: reply.hint } })}\n`)
-  } catch {
-    // No hint rather than a failed turn.
+  } catch (error) {
+    // No hint rather than a failed turn; leave a trace where the logs go.
+    try { appendFileSync(join(process.env.QUENCH_STATE_DIR ?? tmpdir(), 'quench-errors.jsonl'), `${JSON.stringify({ t: new Date().toISOString(), error: String(error) })}\n`) } catch {}
   }
   // Milliseconds from process start (the time origin) to the decision, for the cold-start budget.
   if (process.env.QUENCH_TIMING) process.stderr.write(`${performance.now().toFixed(2)}\n`)

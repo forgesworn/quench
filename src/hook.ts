@@ -19,9 +19,15 @@ export interface HookReply {
 /** The decider the hook runs: the held-out primary frozen in docs/HELDOUT.md. */
 export const hookDecider = 'stale-5'
 
+/**
+ * The log goes to the state directory; the socket always goes to the system
+ * temporary directory, because a Unix socket path over about 104 bytes cannot
+ * be bound (macOS) and state directories inside evidence folders are long.
+ */
 export function statePaths(sessionId: string, dir = process.env.QUENCH_STATE_DIR ?? tmpdir()): { socket: string; log: string } {
   const key = createHash('sha256').update(sessionId).digest('hex').slice(0, 16)
-  return { socket: join(dir, `quench-${key}.sock`), log: join(dir, `quench-${key}.jsonl`) }
+  const socketKey = createHash('sha256').update(`${dir}\0${sessionId}`).digest('hex').slice(0, 16)
+  return { socket: join(tmpdir(), `quench-${socketKey}.sock`), log: join(dir, `quench-${key}.jsonl`) }
 }
 
 export const hintFor = (stop: Decision): string =>
