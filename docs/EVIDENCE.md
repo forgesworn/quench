@@ -867,3 +867,32 @@ lost nothing. On the other two arms it loses evidence in 27 of 48
 sessions. Q4's reading holds for all five: a judge not told what evidence
 the task needs cannot see when it has been gathered. The stop-decider line
 of work ends here (Q6), so no comparator is taken further.
+
+## Q7: `quench report`, 24 September 2026
+
+`src/report.ts` and `src/cli-report.ts` replace the anatomy script. The
+report streams Claude Code and Codex transcripts line by line, keeps token
+counts and model names only, and prints aggregates. Tests cover both
+parsers, the pricing, the simulation, and a fixture run that checks no
+content, project name or path reaches the output, text or JSON.
+
+- **Reproduction:** `node src/cli-report.ts --agent claude --summary 30000`
+  gives the Q8 motivation figures again: components 68% / 20% / 13%,
+  subagents 34%, 49% of cost above 400K, and modelled windows at 600K,
+  400K and 200K of −17%, −29% and −45%. It now sees 394 sessions, as
+  sessions went on after that entry.
+- **Default summary size:** with 10 or more compactions in the
+  transcripts, the context after a modelled compaction is the median after
+  the owner's own (55K on Claude Code), not a fixed 30K. That gives −16%,
+  −27% and −41% at 600K, 400K and 200K, and −38% at 100K, where a 55K
+  restart leaves little to save.
+- **Codex** (the same 30 days, 165 sessions, 35 subagent transcripts,
+  131,996 requests; multipliers assumed from GPT-5 list prices): cache
+  reads 68%, cache writes and fresh input 14%, output 18%; subagents 6%.
+  Sessions of more than 1,000 requests carry 77% of cost. Codex already
+  compacts on its own: 1,023 compactions, a median of 238K before and 25K
+  after. So most of its cost sits at 100–200K (54%), and modelled windows
+  of 200K, 150K and 100K give −12%, −25% and −31%.
+
+These are upper bounds with the agent's behaviour held fixed. Q8 measures
+what compacting costs in accepted work.

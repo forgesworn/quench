@@ -2,7 +2,7 @@
   "name": "@forgesworn/quench",
   "version": "0.0.0",
   "private": true,
-  "description": "Decide when an agent has gathered enough evidence to stop",
+  "description": "See where your coding agent's spend goes, and when a session should compact",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -18,7 +18,7 @@
     "quench-live-check": "src/cli-live-check.ts",
     "quench-hook-sim": "src/cli-hook-sim.ts",
     "quench-chains": "src/cli-chains.ts",
-    "quench-anatomy": "src/cli-anatomy.ts"
+    "quench-report": "src/cli-report.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
@@ -26,7 +26,8 @@
     "check": "npm run typecheck && npm test",
     "data": "node src/cli-data.ts",
     "score": "node src/cli-score.ts",
-    "estimate": "node src/cli-estimate.ts"
+    "estimate": "node src/cli-estimate.ts",
+    "report": "node src/cli-report.ts"
   },
   "devDependencies": {
     "@types/node": "24.13.6",

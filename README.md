@@ -1,19 +1,55 @@
 # Quench
 
-Decide when a coding agent has gathered enough evidence to stop.
+See where your coding agent's spend goes, and when a session should
+compact.
 
 In smithing, quenching is the moment you judge the work is done and stop
-heating. Quench answers the same question for an agent at each decision point:
-**stop, or call another tool?** Agent cost follows turns, because every turn
-resends the conversation, so a correct early stop is the cheapest saving
-available.
+heating. Quench began as a stop decider for coding agents: at each decision
+point, stop gathering evidence or call another tool? Measured on held-out
+tasks and live sessions, a stop saves little. Agents already stop gathering
+near the right point, and they ignore a hint to stop
+([evidence](docs/EVIDENCE.md), Q5 and Q6). The cost is elsewhere: in long
+sessions that resend very large contexts. Quench now measures that cost and
+is testing when a session should compact ([GOALS](GOALS.md), Q7 to Q9).
 
-Private and experimental. Nothing here is a released product or a measured
-saving yet. On the recorded development set, the best safe rule saves executor
-input only on sessions that run long; the held-out test
-([protocol](docs/HELDOUT.md)) has not run.
+Private and experimental. No saving is claimed until the benchmark has
+measured it.
 
-## Why
+## `quench report`
+
+```sh
+node src/cli-report.ts                  # Claude Code and Codex, the last 30 days
+node src/cli-report.ts --agent claude --days 7
+node src/cli-report.ts --json
+```
+
+It reads the transcripts Claude Code (`~/.claude/projects`) and Codex
+(`~/.codex/sessions`) keep on your machine and prints where the cost went:
+
+- cache reads, cache writes and fresh input, output, and the subagents'
+  share;
+- cost by session length and by the size of the context each request sent;
+- the compactions your sessions already made;
+- what compacting at a smaller window would have cost, modelled request by
+  request, with the setting that controls it.
+
+What it does not do:
+
+- It prints aggregates only: no transcript content, project names or paths,
+  and nothing leaves the machine. A test checks this.
+- It prices tokens with multipliers, not money. Claude Code: cache read
+  0.1× (Opus 5.5 0.05×, Fable and Mythos 0.025×), one-hour cache write 2×,
+  five-minute 1.25×, output 5×. Codex (assumed, from GPT-5 list prices):
+  cached input 0.1×, output 8×.
+- The compaction figures are an upper bound. They assume the agent works
+  as well after compacting, and the model leaves out cache expiries (it is
+  compared with the same model of the session as recorded). Whether the
+  agent does work as well is what Q8 measures ([protocol](docs/CHAINS.md)).
+- Transcripts are chosen by file modification time.
+
+## Research: the stop decider
+
+### Why
 
 Recorded sessions from the [Context](https://github.com/forgesworn/context)
 retrieval experiments (117 sessions with declared required evidence, three
@@ -23,22 +59,24 @@ already appeared in tool results (median share: plain 0.57, Graphify 0.40,
 Context 0.47). That is an upper bound on what stopping could save; some later
 steps are necessary (writing the answer, running tests).
 
-## Plan
+### What it found
 
-1. **Labels** (done): `quench-labels` turns recorded sessions into per-point
-   labels, "stop was already correct here" or "not yet", with no model.
-2. **Deterministic decider**: a rule over signals available at run time (for
-   example, every explored symbol has its definition and a test fetched).
-3. **Typed model decider**: a small model returning a structured choice, only
-   if the rule falls short.
-4. **Baselines**: Jev and Laya run on the same snapshots as benchmark
-   comparators only; they are not adopted or embedded.
-5. **Online check**: an executor run with the decider switched on, on held-out
-   tasks, only if the offline benchmark shows savings without premature stops.
+1. **Labels:** `quench-labels` marks each decision point as sufficient or
+   not, with no model.
+2. **Deterministic decider:** the frozen rule `stale-5` saved 41–47% of
+   executor input on held-out tasks under replay, but it lost evidence in 2
+   of 72 sessions (Q5, not met).
+3. **Comparators:** Laya, Open-Jev, Kev and Von, run on the same snapshots,
+   either rarely stop or lose evidence in a third or more of the sessions
+   (Q4). Jev could not be run.
+4. **Live check:** a stop hint cut input by 1.0% and the agent ignored it
+   (Q6, not met). Most of what replay counted as saved was work the agent
+   still had to do; on the Context arm, the pure gathering left after the
+   stop was 0.3–2.6% of input.
 
 See [the goals](GOALS.md) and [the benchmark design](docs/BENCHMARK.md).
 
-## Use
+### Use
 
 ```sh
 npm run check

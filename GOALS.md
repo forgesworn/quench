@@ -1,10 +1,13 @@
 # Quench goals
 
-Updated 23 September 2026. Quench decides, at each decision point of a coding
-agent's session, whether to **stop** gathering evidence or **continue**. A good
-decision saves turns, and turns drive agent cost, because every turn resends
-the conversation. A premature stop costs quality, so it is the failure we
-guard against first.
+Updated 23 September 2026. Quench set out to decide, at each decision point
+of a coding agent's session, whether to **stop** gathering evidence or
+**continue**. Q5 and Q6 showed that a stop saves little: agents already stop
+gathering near the right point, and they ignore a stop hint. The cost of a
+coding agent sits in long sessions that resend very large contexts. From Q7
+on, Quench measures that cost from local transcripts and decides when a
+session should compact. The stop decider and its harness stay as the record
+of what was tried.
 
 This is a private, experimental project. No goal below is met until its
 evidence is recorded in `docs/EVIDENCE.md` against a named commit. Claim only
@@ -194,11 +197,25 @@ lower median input with no fewer accepted tasks, or the result is recorded as
 not met, with the per-task spread. The locked rule is in
 [docs/ONLINE.md](docs/ONLINE.md).
 
-### Q7: Packaging (only after Q6 passes)
+### Q7: Ship what the evidence supports
 
-Publish the decider as a small package with its hook or MCP entry point,
-documentation of what it saw, measured and did not measure, and a changelog.
-Release through the authorised process only.
+Q6 did not pass, so the stop hint is not packaged. What is shipped instead:
+
+1. **`quench report`**: reads the local transcripts of Claude Code and
+   Codex and reports where the spend goes (cache reads, writes, output,
+   subagents, session length, context size) and what compacting at each
+   window would have saved, as an upper bound. It prints aggregates only:
+   no content, no project names, no paths.
+2. **A compaction policy**, after Q8: the window setting if Q8 rule 1 alone
+   is met, or a boundary-aware trigger if rules 1 and 2 are met (Q9).
+3. **A release** as an npm package and a Claude Code plugin, through the
+   authorised process only and with the owner's go-ahead.
+
+**Done when:** `quench report` is tested (parsers, pricing, simulation, and a
+test that no transcript content or project name reaches the output), runs
+on both agents' transcripts, reproduces the Q8 motivation figures, and its
+README states what it measures and what it does not. A saving is claimed
+only once Q8 measures the quality cost.
 
 ### Q8: When to compact a long session
 
@@ -223,10 +240,24 @@ before any counted run, the runs are recorded, and the result is written up
 with per-chain and per-step spread. It must say whether a boundary-aware
 trigger (a Quench decider) is worth building over the plain window setting.
 
+### Q9: A boundary-aware compaction trigger (only if Q8 rules 1 and 2 are met)
+
+Decide, from what exists at run time, when a session has reached a task
+boundary and should compact. Deliver it where it can act: in headless and
+SDK runs the harness compacts itself, as the Q8 runner does; in interactive
+Claude Code, find out first what a hook or plugin can do, and settle for a
+prompt to the user if nothing can start a compaction.
+
+**Done when:** the trigger is locked before scoring, beats the window
+setting on fresh chains under a locked protocol, and meets the latency
+budgets above.
+
 ## Order and handoff
 
 Q0, Q1, Q2 in order, then Q3 only if needed. Q4 can start once Q1 exists. Q5
 can be prepared alongside Q2 by a separate session. Q6 waits for Q5 and a
-passing offline decider. Each handoff names the goal, starting commit, allowed
-files, model and effort, and acceptance checks. The receiver returns the diff,
-checks and evidence entry.
+passing offline decider. Q7's report can ship before Q8 ends; its
+compaction policy waits for Q8, and Q9 waits for Q8's rules 1 and 2. Each
+handoff names the goal, starting commit, allowed files, model and effort,
+and acceptance checks. The receiver returns the diff, checks and evidence
+entry.
