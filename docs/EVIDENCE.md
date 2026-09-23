@@ -580,3 +580,56 @@ better than chance. A general judge that is not told which evidence the task
 needs cannot see when it is complete. The frozen rule `stale-5` saves 21 to
 30% of input with no lost evidence, doing better than every comparator, at
 microseconds per decision rather than a model call.
+
+## Q5 Flash pilot result (secondary), 23 September 2026
+
+Secondary evidence only: `deepseek-v4.1-flash:cloud`, one repetition, 24
+sessions. It does not count towards the Q5 verdict.
+
+- **Recording:** 24 of 24 sessions ran. The checker passed 21; one Context
+  code change failed its scope check, leaving 20 of 24 accepted. The three
+  checker failures were all orientation-commander, each one field wrong.
+- **Live hook against replay:** in 23 of 24 sessions the hook withheld its
+  stop at exactly the replay stop point. In the other, replay stops at the
+  final point (28) and the hook logged nothing there: the agent's last
+  results and its final answer came with no later hook call to decide on.
+  A stop at the last point saves nothing.
+- **Labeller bug, found here and fixed at the next commit.** Three
+  markdown-it tasks each declare one token at two paths. The labeller
+  compared distinct tokens seen with the number of items, so those tasks
+  could never be sufficient, and every stop in them counted as premature.
+  No development task shares a token, so the development labels digest
+  (`66384806`) and every earlier result are unchanged.
+- **Reads-only view added.** The development set labelled no code-change
+  tasks; the held-out set does, and code changes interleave edits with
+  reading. The locked measure counts every point between the stop and the
+  last read as saved, edits included. The reads-only view counts only
+  points made of reads alone. It is reported next to the locked measure,
+  which does not change.
+
+Pilot data set: manifest `a4d66a69…`, labels `761d5651…` after the fix.
+`stale-5`, the frozen primary. Each cell gives premature (lost evidence),
+then saved executor input under the locked measure and under the reads-only
+view:
+
+| Arm (8 sessions) | stale-5 | oracle (bound) |
+| --- | --- | --- |
+| plain | 0 (0), 36.7%, 13.0% | 68.2%, 35.3% |
+| graphify | 0 (0), 29.9%, 14.3% | 58.4%, 33.6% |
+| context | 0 (0), 40.3%, 19.1% | 66.2%, 38.0% |
+
+- **Breadth:** leaving out the task that saved most, the locked measure
+  saves 17.2%, 21.8% and 24.2% by arm, and the reads-only view 8.3%, 10.5%
+  and 11.4%.
+- **Where the saving comes from:** the code-change tasks save most. Under
+  the reads-only view that falls from 52–77% to 21–35% per session, because
+  much of the "saved" tail was edits and test runs.
+- **Latency:** p50 10 µs, p99 154 µs.
+
+Development set under the reads-only view, for comparison: `stale-5` saves
+18.6%, 14.0% and 24.5% (the locked measure: 21.5%, 20.9% and 30.3%).
+
+What this shows, as a pilot: the frozen rule made no premature stop and lost
+no evidence on held-out tasks, and it saved input under both measures.
+Whether the saving clears 20% depends on how edits interleaved with reading
+are counted. Any claim after the Pro verdict will give both figures.
