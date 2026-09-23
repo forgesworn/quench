@@ -25,6 +25,8 @@ export interface RuleParams {
   stopOnRepeat?: boolean
   /** Never stop before this many decision points. */
   minPoints?: number
+  /** Once a session reaches `after` points, stop after this shorter run with no new file. */
+  longSession?: { after: number; staleFor: number }
 }
 
 // Anchored on the extension, then walked back to the path's start: scanning
@@ -123,6 +125,7 @@ export function ruleDecider(params: RuleParams): Decider {
     if (params.stopOnCleanCoverage && cleanCoverage) return { decision: 'stop', reason: 'coverage reports nothing missing' }
     if (params.stopOnRepeat && repeatNow) return { decision: 'stop', reason: 'repeated an earlier read' }
     if (params.staleFor !== undefined && pointsSinceNewFile >= params.staleFor) return { decision: 'stop', reason: `no new file for ${pointsSinceNewFile} points` }
+    if (params.longSession && points >= params.longSession.after && pointsSinceNewFile >= params.longSession.staleFor) return { decision: 'stop', reason: `long session: no new file for ${pointsSinceNewFile} points at point ${points}` }
     return cont('still gathering')
   }
 

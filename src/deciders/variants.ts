@@ -38,6 +38,27 @@ Object.assign(variants, {
   'coverage-or-stale-5': { requireTestAndImpl: true, stopOnCleanCoverage: true, staleFor: 5 },
 } satisfies Record<string, RuleParams>)
 
+/**
+ * Batch 3, locked 23 September 2026 after batches 1 and 2 were scored, before
+ * batch 3 was. Hypothesis from the development set: the stale rule saves input
+ * only on sessions that run long, and catches them late. These keep
+ * coverage-or-stale-5 and add a stricter stale limit once a session is long;
+ * ordinary sessions (median 13 points) should be unaffected.
+ *
+ * Selection rule, fixed with this batch: among all scored variants that keep
+ * premature stops at or under 5% and have no stop that lost evidence in every
+ * arm, within the latency budgets, the held-out primary is the one with the
+ * highest minimum across arms of saved executor input (total over the arm's
+ * sessions). Ties go to the variant with fewer parts.
+ */
+Object.assign(variants, {
+  'long15-stale-3': { requireTestAndImpl: true, stopOnCleanCoverage: true, staleFor: 5, longSession: { after: 15, staleFor: 3 } },
+  'long15-stale-2': { requireTestAndImpl: true, stopOnCleanCoverage: true, staleFor: 5, longSession: { after: 15, staleFor: 2 } },
+  'long20-stale-2': { requireTestAndImpl: true, stopOnCleanCoverage: true, staleFor: 5, longSession: { after: 20, staleFor: 2 } },
+  // A hard cap: stop at point 30 whatever the agent is doing, once tests and implementation were read.
+  'cap-30': { requireTestAndImpl: true, stopOnCleanCoverage: true, staleFor: 5, longSession: { after: 30, staleFor: 0 } },
+} satisfies Record<string, RuleParams>)
+
 export const variantFactories: Record<string, DeciderFactory> = Object.fromEntries(
   Object.entries(variants).map(([name, params]) => [name, () => ruleDecider(params)]),
 )

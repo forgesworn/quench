@@ -50,3 +50,10 @@ test('read novelty ignores listed paths but counts a listed path once it is read
   assert.deepEqual(decisions({ requireTestAndImpl: true, staleOn: 'read', staleFor: 1 }, batches), ['continue', 'continue', 'stop', 'continue', 'stop'])
   assert.deepEqual(decisions({ requireTestAndImpl: true, staleFor: 1 }, batches), ['continue', 'continue', 'continue', 'stop', 'stop'])
 })
+
+test('a long session switches to the stricter stale limit', () => {
+  // Every batch reads a new file until point 4; after that nothing new appears.
+  const batches = [read('a', 'src/a.ts'), read('b', 'src/a.test.ts'), read('c', 'src/c.ts'), read('d', 'src/d.ts'), read('e', 'src/a.ts'), read('f', 'src/c.ts'), read('g', 'src/d.ts')]
+  assert.deepEqual(decisions({ requireTestAndImpl: true, staleFor: 5, longSession: { after: 6, staleFor: 2 } }, batches), ['continue', 'continue', 'continue', 'continue', 'continue', 'stop', 'stop'])
+  assert.deepEqual(decisions({ requireTestAndImpl: true, staleFor: 5 }, batches), ['continue', 'continue', 'continue', 'continue', 'continue', 'continue', 'continue'])
+})
