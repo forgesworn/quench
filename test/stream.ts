@@ -3,3 +3,5 @@ export const call = (id: string, name = 'Read', input: object = {}) => ({ type: 
 export const result = (id: string, text: string, isError = false) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text }], is_error: isError }] } })
 export const say = (text: string) => ({ type: 'assistant', message: { content: [{ type: 'text', text }] } })
 export const stream = (events: object[]) => events.map((event) => JSON.stringify(event)).join('\n')
+/** Attaches an assistant message id and its recorded input tokens, as Claude Code streams them. */
+export const usage = <T extends { message: object }>(event: T, id: string, inputTokens: number): T => ({ ...event, message: { ...event.message, id, usage: { input_tokens: inputTokens, output_tokens: 0 } } })

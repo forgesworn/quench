@@ -45,6 +45,13 @@ export interface SessionPoint {
 export interface ParsedSession {
   events: SessionEvent[]
   points: SessionPoint[]
+  /**
+   * Executor input tokens per assistant message, grouped by how many decision
+   * points had passed when the message was sent: index p holds the messages
+   * sent after point p (index 0: before the first point). A stop at point s
+   * removes the messages at indexes s and later that led to further reads.
+   */
+  inputTokensAfter: number[]
 }
 
 interface ContentPart {
@@ -79,11 +86,26 @@ export function classifyCall(name: string, input: unknown): CallClass {
   return 'read'
 }
 
+interface ParsedLine {
+  events: SessionEvent[]
+  /** The assistant message this line belongs to, when the stream records its usage. */
+  message?: { id: string; inputTokens: number }
+}
+
+function parseLine(line: string): ParsedLine {
+  if (!line.trim()) return { events: [] }
+  let event: { type?: string; message?: { id?: string; content?: unknown; usage?: { input_tokens?: number } } }
+  try { event = JSON.parse(line) } catch { return { events: [] } }
+  const id = event.message?.id
+  const inputTokens = event.message?.usage?.input_tokens
+  const message = event.type === 'assistant' && typeof id === 'string' && typeof inputTokens === 'number' ? { id, inputTokens } : undefined
+  return { events: eventsOf(event), ...(message ? { message } : {}) }
+}
+
 /** Normalises one stream-json line; returns no events for lines that carry none. */
-export function eventsOfLine(line: string): SessionEvent[] {
-  if (!line.trim()) return []
-  let event: { type?: string; message?: { content?: unknown } }
-  try { event = JSON.parse(line) } catch { return [] }
+export const eventsOfLine = (line: string): SessionEvent[] => parseLine(line).events
+
+function eventsOf(event: { type?: string; message?: { content?: unknown } }): SessionEvent[] {
   const content = event.message?.content
   if (!Array.isArray(content)) return []
   const out: SessionEvent[] = []
@@ -106,13 +128,24 @@ export function parseSession(streamText: string, prompt?: string): ParsedSession
   let toolCalls = 0
   let resultBytes = 0
   let errors = 0
+  const inputTokensAfter: number[] = [0]
+  const messages = new Set<string>()
   const close = (): void => {
     if (batch.length === 0) return
     points.push({ index: points.length + 1, eventEnd: events.length, toolCalls, resultBytes, errors, calls: batch })
+    inputTokensAfter[points.length] ??= 0
     batch = []
   }
   for (const line of streamText.split('\n')) {
-    for (const event of eventsOfLine(line)) {
+    const parsed = parseLine(line)
+    // A message's lines stream in parts that repeat its usage; count it once. Pending
+    // results mean the decision point has passed even before it is closed.
+    if (parsed.message && !messages.has(parsed.message.id)) {
+      messages.add(parsed.message.id)
+      const after = points.length + (batch.length > 0 ? 1 : 0)
+      inputTokensAfter[after] = (inputTokensAfter[after] ?? 0) + parsed.message.inputTokens
+    }
+    for (const event of parsed.events) {
       if (event.kind === 'tool_use' || event.kind === 'text') close()
       if (event.kind === 'tool_use') {
         toolCalls += 1
@@ -128,5 +161,5 @@ export function parseSession(streamText: string, prompt?: string): ParsedSession
     }
   }
   close()
-  return { events, points }
+  return { events, points, inputTokensAfter }
 }

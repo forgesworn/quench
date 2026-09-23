@@ -7,6 +7,8 @@
 //   finishing steps a stop still requires (the recorded writes and checks
 //   after the session's last evidence read);
 // - late: points between the first sufficient point and the stop (or the end).
+// Savings are also weighted by executor input tokens, where the stream records
+// them: every turn resends the conversation, so late turns cost the most.
 import type { DeciderFactory } from './decider.ts'
 import type { SessionLabels } from './labels.ts'
 import type { ParsedSession, SessionPoint } from './session.ts'
@@ -24,6 +26,8 @@ export interface Cost {
   decisionPoints: number
   toolCalls: number
   resultBytes: number
+  /** Executor input tokens of the messages that led to these points. */
+  inputTokens: number
 }
 
 export interface SessionScore {
@@ -42,6 +46,9 @@ export interface SessionScore {
   finishing: Cost
   saved: Cost
   savedShare: number
+  /** Executor input tokens over the whole recorded session. */
+  inputTokens: number
+  savedInputShare: number
 }
 
 export interface ReplayResult {
@@ -51,11 +58,17 @@ export interface ReplayResult {
 }
 
 const sum = <T>(items: T[], pick: (item: T) => number): number => items.reduce((total, item) => total + pick(item), 0)
-const cost = (points: SessionPoint[]): Cost => ({
-  decisionPoints: points.length,
-  toolCalls: sum(points, (point) => point.calls.length),
-  resultBytes: sum(points, (point) => point.calls.reduce((total, call) => total + call.resultBytes, 0)),
-})
+/** Cost of the points after `from` up to and including `to`, and of the messages sent after points from..to-1. */
+const cost = (parsed: ParsedSession, from: number, to: number): Cost => {
+  const points = parsed.points.filter((point) => point.index > from && point.index <= to)
+  return {
+    decisionPoints: points.length,
+    toolCalls: sum(points, (point) => point.calls.length),
+    resultBytes: sum(points, (point) => point.calls.reduce((total, call) => total + call.resultBytes, 0)),
+    inputTokens: sum(parsed.inputTokensAfter.slice(from, Math.max(from, to)), (tokens) => tokens ?? 0),
+  }
+}
+const none: Cost = { decisionPoints: 0, toolCalls: 0, resultBytes: 0, inputTokens: 0 }
 
 /** Index of the last point with an evidence read; 0 when the session never read. */
 export function lastReadPoint(parsed: ParsedSession): number {
@@ -70,9 +83,12 @@ export function finishingPoints(parsed: ParsedSession): SessionPoint[] {
 
 /** What a stop at stopAt saves against the recorded session; a stop still pays the finishing steps. */
 export function savedAfter(parsed: ParsedSession, stopAt: number | null): Cost {
-  if (stopAt === null) return { decisionPoints: 0, toolCalls: 0, resultBytes: 0 }
-  const lastRead = lastReadPoint(parsed)
-  return cost(parsed.points.filter((point) => point.index > stopAt && point.index <= lastRead))
+  return stopAt === null ? none : cost(parsed, stopAt, lastReadPoint(parsed))
+}
+
+/** Finishing cost: the points after the last read and every message sent from there on. */
+export function finishingCost(parsed: ParsedSession): Cost {
+  return cost(parsed, lastReadPoint(parsed), parsed.inputTokensAfter.length)
 }
 
 export function replay(session: ReplaySession, factory: DeciderFactory): ReplayResult {
@@ -99,6 +115,7 @@ export function replay(session: ReplaySession, factory: DeciderFactory): ReplayR
   const sufficientAtStop = stopAt === null ? true : labels.points[stopAt - 1]?.sufficient === true
   const end = stopAt ?? parsed.points.length
   const saved = savedAfter(parsed, stopAt)
+  const inputTokens = sum(parsed.inputTokensAfter, (tokens) => tokens ?? 0)
   return {
     score: {
       run: session.run,
@@ -112,9 +129,11 @@ export function replay(session: ReplaySession, factory: DeciderFactory): ReplayR
       premature: !sufficientAtStop,
       lostEvidence: stopAt !== null && (labels.points[stopAt - 1]?.found ?? 0) < labels.found,
       late: labels.firstSufficient === null || !sufficientAtStop ? null : end - labels.firstSufficient,
-      finishing: cost(finishingPoints(parsed)),
+      finishing: finishingCost(parsed),
       saved,
       savedShare: parsed.points.length ? saved.decisionPoints / parsed.points.length : 0,
+      inputTokens,
+      savedInputShare: inputTokens ? saved.inputTokens / inputTokens : 0,
     },
     decisionNs,
   }
@@ -130,6 +149,10 @@ export interface GroupSummary {
   medianSavedShare: number
   saved: Cost
   medianLate: number | null
+  inputTokens: number
+  /** Saved executor input over all the group's sessions: the cost view, where long sessions weigh most. */
+  savedInputShare: number
+  medianSavedInputShare: number
 }
 
 export const median = (values: number[]): number | null => {
@@ -147,6 +170,7 @@ export const percentile = (values: number[], p: number): number | null => {
 
 export function summarise(scores: SessionScore[]): GroupSummary {
   const premature = scores.filter((score) => score.premature).length
+  const inputTokens = sum(scores, (score) => score.inputTokens)
   return {
     sessions: scores.length,
     reachedSufficiency: scores.filter((score) => score.firstSufficient !== null).length,
@@ -159,8 +183,12 @@ export function summarise(scores: SessionScore[]): GroupSummary {
       decisionPoints: sum(scores, (score) => score.saved.decisionPoints),
       toolCalls: sum(scores, (score) => score.saved.toolCalls),
       resultBytes: sum(scores, (score) => score.saved.resultBytes),
+      inputTokens: sum(scores, (score) => score.saved.inputTokens),
     },
     medianLate: median(scores.flatMap((score) => (score.late === null ? [] : [score.late]))),
+    inputTokens,
+    savedInputShare: inputTokens ? sum(scores, (score) => score.saved.inputTokens) / inputTokens : 0,
+    medianSavedInputShare: median(scores.map((score) => score.savedInputShare)) ?? 0,
   }
 }
 
