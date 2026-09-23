@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Write every decision point's snapshot, deduplicated by hash, as JSONL for Laya.
-// Usage: node comparators/laya/export.ts <out.jsonl>
+// Usage: node comparators/laya/export.ts <out.jsonl> [config.json]
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadConfig, loadSessions, type Manifest } from '../../src/data.ts'
@@ -9,7 +9,7 @@ import { snapshotKey, snapshotter } from '../snapshot.ts'
 
 const out = process.argv[2]
 if (!out) throw new Error('usage: export.ts <out.jsonl>')
-const config = loadConfig()
+const config = loadConfig(process.argv[3])
 const manifest = JSON.parse(readFileSync(join(config.out, 'manifest.json'), 'utf8')) as Manifest
 const seen = new Map<string, string>()
 for (const loaded of loadSessions(config, manifest)) {
