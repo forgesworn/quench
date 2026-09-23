@@ -476,3 +476,29 @@ premature, including in sessions that never gather the rest. The lost-evidence
 count separates a stop that cost evidence from one in a session that would
 never have found it, and it will be reported next to the verdict. Neither
 the protocol nor the tasks change because of this.
+
+## Latency on a quiet machine, 23 September 2026
+
+Measured on a second machine, an Apple M4 with 16 cores and 64 GB (load
+average about 1.0 before and 1.8 after), with Node 24.14.0. The code was at
+`86996cf`, and the recorded files were copied there for the run and then
+deleted. Rebuilding the data set there gave the same manifest
+(`007d120c…`) and labels (`66384806…`) digests, so the freeze reproduces on
+a second machine.
+
+| Decider | Decisions | p50 | p99 | max | Cold start (median of 60) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `stale-5` (held-out primary) | 2,056 | 5.8 µs | 55.0 µs | 218 µs | 10.6 ms (max 37.3) |
+| `coverage-or-stale-5` | 2,054 | 5.8 µs | 55.8 µs | 210 µs | 10.6 ms (max 12.1) |
+
+Cold start runs from the time origin to the first decision; wall time from
+spawn to exit was 18.2 ms. Scores matched the main machine exactly.
+
+The hook, driven over all 135 sessions (2,961 calls), delivered the hint at
+the replay stop point in 135 of 135. Time from process start to decision:
+median 13.4 ms, p99 18.1 ms, max 39.3 ms (a first call, which decides in
+process and starts the background process). Wall time per call: median
+21.1 ms, p99 27.1 ms.
+
+Every budget in GOALS is met with room to spare: p50 under 0.1 ms, p99 under
+1 ms, and cold start under 30 ms.
