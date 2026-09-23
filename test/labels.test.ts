@@ -1,10 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { labelSession } from '../src/labels.ts'
-
-const call = (id: string) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Read', input: {} }] } })
-const result = (id: string, text: string, isError = false) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text }], is_error: isError }] } })
-const stream = (events: object[]) => events.map((event) => JSON.stringify(event)).join('\n')
+import { call, result, say, stream } from './stream.ts'
 
 test('labels the first point where every required token has appeared and the headroom after it', () => {
   const text = stream([
@@ -12,7 +9,7 @@ test('labels the first point where every required token has appeared and the hea
     call('b'), result('b', 'beta test title'),
     call('c'), result('c', 'nothing new', true),
     call('d'), result('d', 'more reading'),
-    { type: 'assistant', message: { content: [{ type: 'text', text: 'done' }] } },
+    say('done'),
   ])
   const labels = labelSession(text, [{ token: 'function alpha' }, { token: 'beta test' }])
   assert.equal(labels.decisionPoints, 4)

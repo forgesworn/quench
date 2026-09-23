@@ -1,11 +1,9 @@
-// Per-turn "stop was already correct" labels from a recorded agent session.
+// Per-point "stop was already correct" labels from a recorded agent session.
 //
-// A session is a stream of JSON events (Claude Code stream-json): assistant
-// messages carrying tool_use blocks and user messages carrying tool_result
-// blocks. A decision point follows each batch of tool results: the agent could
-// stop there or call another tool. The label at a point is whether every
-// required evidence token has already appeared in some tool result. No model
-// is involved; labels are only as good as the task's declared evidence.
+// The label at a decision point is whether every required evidence token has
+// already appeared in some tool result. No model is involved; labels are only
+// as good as the task's declared evidence. Deciders never import this module.
+import { parseSession, type ParsedSession } from './session.ts'
 
 export interface RequiredEvidence {
   token: string
@@ -35,60 +33,32 @@ export interface LabelOptions {
   ignoreTokens?: Iterable<string>
 }
 
-interface ContentPart {
-  type?: string
-  text?: string
-  content?: string | ContentPart[]
-  is_error?: boolean
-}
-
-const textOf = (content: string | ContentPart[] | undefined): string => typeof content === 'string'
-  ? content
-  : (content ?? []).map((part) => (part.type === 'text' ? part.text ?? '' : '')).join('\n')
-
-export function labelSession(streamText: string, required: RequiredEvidence[], options: LabelOptions = {}): SessionLabels {
+export function labelParsed(session: ParsedSession, required: RequiredEvidence[], options: LabelOptions = {}): SessionLabels {
   const ignore = new Set(options.ignoreTokens ?? [])
   const tokens = required.map((item) => item.token).filter((token) => !ignore.has(token))
   const seen = new Set<string>()
   const points: DecisionPoint[] = []
-  let toolCalls = 0
-  let resultBytes = 0
-  let pendingResults = 0
-  let errors = 0
-  const close = (): void => {
-    if (pendingResults === 0) return
+  let cursor = 0
+  for (const point of session.points) {
+    for (; cursor < point.eventEnd; cursor += 1) {
+      const event = session.events[cursor]
+      if (event?.kind !== 'tool_result') continue
+      for (const token of tokens) if (!seen.has(token) && event.text.includes(token)) seen.add(token)
+    }
     points.push({
-      index: points.length + 1,
-      toolCalls,
-      resultBytes,
-      errors,
+      index: point.index,
+      toolCalls: point.toolCalls,
+      resultBytes: point.resultBytes,
+      errors: point.errors,
       found: seen.size,
       sufficient: tokens.length > 0 && seen.size === tokens.length,
     })
-    pendingResults = 0
   }
-  for (const line of streamText.split('\n')) {
-    if (!line.trim()) continue
-    let event: { type?: string; message?: { content?: unknown } }
-    try { event = JSON.parse(line) } catch { continue }
-    const content = event.message?.content
-    if (!Array.isArray(content)) continue
-    const parts = content as ContentPart[]
-    if (event.type === 'assistant') {
-      close()
-      toolCalls += parts.filter((part) => part.type === 'tool_use').length
-    } else if (event.type === 'user') {
-      for (const part of parts) {
-        if (part.type !== 'tool_result') continue
-        pendingResults += 1
-        if (part.is_error) errors += 1
-        const text = textOf(part.content)
-        resultBytes += Buffer.byteLength(text)
-        for (const token of tokens) if (!seen.has(token) && text.includes(token)) seen.add(token)
-      }
-    }
+  for (; cursor < session.events.length; cursor += 1) {
+    const event = session.events[cursor]
+    if (event?.kind !== 'tool_result') continue
+    for (const token of tokens) if (!seen.has(token) && event.text.includes(token)) seen.add(token)
   }
-  close()
   const firstSufficient = points.find((point) => point.sufficient) ?? null
   const last = points.at(-1) ?? null
   return {
@@ -107,4 +77,8 @@ export function labelSession(streamText: string, required: RequiredEvidence[], o
         }
       : null,
   }
+}
+
+export function labelSession(streamText: string, required: RequiredEvidence[], options: LabelOptions = {}): SessionLabels {
+  return labelParsed(parseSession(streamText), required, options)
 }

@@ -40,9 +40,21 @@ See [the goals](GOALS.md) and [the benchmark design](docs/BENCHMARK.md).
 
 ```sh
 npm run check
-node src/cli-labels.ts --acceptance <dir of task acceptance JSON> <label>=<evidence dir> [...]
+node src/cli-data.ts                          # Q0: rebuild results/manifest.json and labels.json
+node src/cli-score.ts --decider oracle        # Q1: score a decider (oracle, always-continue, ...)
+node src/cli-score.ts --decider always-continue --cold 30
+```
+
+`quench.local.json` (untracked) points at the private evidence:
+
+```json
+{
+ "acceptance": "<dir of <task>.json with requiredEvidence>",
+ "out": "results",
+ "runs": [{ "label": "v1", "dir": "<evidence dir>", "exclude": ["invalid-runs"] }]
+}
 ```
 
 Evidence directories hold one cell per session: `receipt.json` (task, arm,
-accepted) and `executor.stream.jsonl`. Recorded evidence stays private and
-outside this repository.
+accepted), `executor.prompt.txt` and `executor.stream.jsonl`. Recorded evidence
+stays private and outside this repository; `results/` is untracked.
