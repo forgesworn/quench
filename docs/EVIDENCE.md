@@ -773,3 +773,37 @@ also ignored. Q7 (packaging) waits for Q6 to pass, so nothing is packaged.
 A new attempt would need a decider aimed at the first sufficient point, a
 mechanism the agent cannot ignore, the pure-gathering measure locked as
 primary, and fresh held-out tasks.
+
+## Q8 motivation: where Claude Code spend goes, 23 September 2026
+
+`node src/cli-anatomy.ts` over the owner's local transcripts for the last 30
+days. It prints aggregates only, and no content or project names leave the
+machine. Cost is in base-input units at the multipliers Claude Code incurs:
+one-hour cache write 2×, cache read 0.1× (0.05× on Opus 5.5, 0.025× on
+Fable), output 5×.
+
+- **Scope:** 785 transcripts (392 main sessions and 366 subagent
+  transcripts), 79,167 requests. Subagents are 34% of cost.
+- **Components:** cache reads 68%, cache writes and fresh input 20%, output
+  13%.
+- **Session length:** sessions of more than 300 requests (45 of 392) carry
+  80% of main-session cost.
+- **Context size:** requests sent with more than 200K tokens of context
+  carry 78% of cost, and those above 400K carry 49%. Within the latter,
+  cache reads are 76% of cost.
+- **Natural compactions:** 94 with 30 requests either side. The median
+  context fell from 415K to 55K, and context growth per request over the
+  next 30 requests was 1.31× what it was before.
+- **Earlier compaction, simulated** (the same behaviour assumed, so an upper
+  bound; the model with no intervention sits 7% under the recorded cost and
+  is the baseline): compacting at 600K saves 17%, at 400K 29%, at 200K 45%,
+  and at 120K 51%.
+
+On the Q5 and online DeepSeek sessions, the same multipliers split cost
+roughly into thirds between cache writes, cache reads and output. There,
+evicting old tool results or capping result size saved about nothing once
+cache rebuilds were counted. Routing the gathering phase to Haiku saved
+about 20% under Opus 5 and about 5% under Sonnet 5, with the same
+behaviour assumed. The held-out tasks are short (a median of 22 requests),
+which is the regime with least to save. Q8 tests compaction timing in
+longer, dependent sessions.
