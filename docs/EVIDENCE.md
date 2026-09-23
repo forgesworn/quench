@@ -534,3 +534,49 @@ Pro.
   missing transcript; the second exposed the socket path limit (fixed at the
   commit above). In the second, the live hook withheld its stop at point 20
   of 31, and an offline replay of the recorded stream also stops at point 20.
+
+## Q4 addendum: Open-Jev as a comparator, 23 September 2026
+
+Open-Jev (github.com/Zefan-Cai/Open-Jev, MIT, commit `3308a15`) is independent
+open research inspired by TypeSafe's Jev. It is not Jev, and Jev remains not
+scored. The adapter was locked at `00266d1` before any answer existed: it
+asks the question Laya was asked, on the same snapshots, at the same
+thresholds (0.5 and 0.8).
+
+- **Run:** locally on an Apple M4 (Apple GPU via PyTorch 2.14; transformers
+  5.10.2, peft 0.19.1), so no hosted spend. The published 2B and 9B packages
+  ran over pinned base weights: `Qwen/Qwen3.5-2B` at `15852e8c` and
+  `Qwen/Qwen3.5-9B` at `c2022362`.
+- **Snapshots:** all 2,451 distinct snapshots of the full freeze (Laya was
+  run on the 2,070 of the first freeze). Time per snapshot: 2B about 0.47 s,
+  9B about 2.1 s.
+
+Full freeze, each cell giving stopped / premature (lost evidence) / total
+saved executor input:
+
+| Comparator | plain (37) | graphify (37) | context (61) |
+| --- | --- | --- | --- |
+| `open-jev-2b-50` | 1 / 0 / 0% | 0 / 0 / 0% | 0 / 0 / 0% |
+| `open-jev-2b-80` | 0 / 0 / 0% | 0 / 0 / 0% | 0 / 0 / 0% |
+| `open-jev-9b-50` | 29 / 10 (8) / 48.2% | 18 / 5 (4) / 23.2% | 37 / 16 (10) / 34.5% |
+| `open-jev-9b-80` | 6 / 1 (1) / 3.5% | 0 / 0 / 0% | 1 / 1 (1) / 0.9% |
+
+How well each probability separates sufficient from insufficient points (the
+chance that a random sufficient point scores higher than a random
+insufficient one; 0.5 is chance). This is a description, not a scored
+variant:
+
+| Comparator | Points | AUC | Mean p (sufficient / not) |
+| --- | ---: | ---: | --- |
+| Open-Jev 2B | 2,454 | 0.567 | 0.058 / 0.051 |
+| Open-Jev 9B | 2,454 | 0.609 | 0.303 / 0.245 |
+| Laya (first freeze) | 2,073 | 0.561 | 0.658 / 0.636 |
+
+Neither size is useful as a stop decider here. The 2B almost never says
+stop. The 9B at 0.5 saves input only by stopping too early and losing
+evidence; at 0.8 it saves almost nothing and still loses evidence twice.
+None of the three judges separates sufficient from insufficient points much
+better than chance. A general judge that is not told which evidence the task
+needs cannot see when it is complete. The frozen rule `stale-5` saves 21 to
+30% of input with no lost evidence, doing better than every comparator, at
+microseconds per decision rather than a model call.
