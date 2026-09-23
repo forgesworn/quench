@@ -72,3 +72,12 @@ The local route's actual charge depends on the owner's plan. Claude Code's
 own cost field for these sessions reports a basis of "unknown" (it showed a
 nominal $154 for the 72 development sessions), so it is not a price. The
 Context and Graphify index builds are local and free.
+
+## Recording setup (when approved)
+
+Record with the Quench hook installed in off mode (`QUENCH_HINT=off`, see
+`README.md` and `docs/ONLINE.md`). It prints nothing, so the agent is
+unaffected. Its logs let the online check reuse these sessions as the off
+condition, and they check on held-out sessions that the live decisions match
+replay. This needs the recording harness to pass the hook settings; make
+that change in the harness owner's repository.
