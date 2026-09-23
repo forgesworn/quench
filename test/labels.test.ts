@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { labelSession } from '../src/labels.ts'
+import { labelParsed, labelSession } from '../src/labels.ts'
+import { parseSession } from '../src/session.ts'
 import { call, result, say, stream } from './stream.ts'
 
 test('labels the first point where every required token has appeared and the headroom after it', () => {
@@ -31,4 +32,12 @@ test('ignores tokens a tool prints in its own metadata and tolerates malformed l
   const labels = labelSession(text, [{ token: 'alpha' }, { token: 'local-source-unsigned' }], { ignoreTokens: ['local-source-unsigned'] })
   assert.equal(labels.required, 1)
   assert.equal(labels.firstSufficient, 1)
+})
+
+test('two evidence items may share a token; both are found when it appears', () => {
+  const parsed = parseSession(stream([call('a'), result('a', 'shared line'), call('b'), result('b', 'other line')]), 'task')
+  const labels = labelParsed(parsed, [{ token: 'shared line' }, { token: 'shared line' }, { token: 'other line' }])
+  assert.deepEqual(labels.points.map((point) => [point.found, point.sufficient]), [[2, false], [3, true]])
+  assert.equal(labels.firstSufficient, 2)
+  assert.equal(labels.found, 3)
 })

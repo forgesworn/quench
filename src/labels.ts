@@ -37,6 +37,9 @@ export function labelParsed(session: ParsedSession, required: RequiredEvidence[]
   const ignore = new Set(options.ignoreTokens ?? [])
   const tokens = required.map((item) => item.token).filter((token) => !ignore.has(token))
   const seen = new Set<string>()
+  // Evidence items, not distinct tokens: two items may share a token (the same line in two files),
+  // and each is found once its token has appeared.
+  const foundItems = (): number => tokens.filter((token) => seen.has(token)).length
   const points: DecisionPoint[] = []
   let cursor = 0
   for (const point of session.points) {
@@ -50,8 +53,8 @@ export function labelParsed(session: ParsedSession, required: RequiredEvidence[]
       toolCalls: point.toolCalls,
       resultBytes: point.resultBytes,
       errors: point.errors,
-      found: seen.size,
-      sufficient: tokens.length > 0 && seen.size === tokens.length,
+      found: foundItems(),
+      sufficient: tokens.length > 0 && foundItems() === tokens.length,
     })
   }
   for (; cursor < session.events.length; cursor += 1) {
@@ -63,7 +66,7 @@ export function labelParsed(session: ParsedSession, required: RequiredEvidence[]
   const last = points.at(-1) ?? null
   return {
     required: tokens.length,
-    found: seen.size,
+    found: foundItems(),
     missing: tokens.filter((token) => !seen.has(token)),
     points,
     decisionPoints: points.length,

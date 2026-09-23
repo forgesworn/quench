@@ -43,8 +43,8 @@ for (const loaded of loadSessions(config, manifest)) {
 
 const pct = (value: number): string => `${(value * 100).toFixed(1)}%`
 const row = (label: string, s: GroupSummary): string =>
-  `${label}\t${s.sessions}\t${s.reachedSufficiency}\t${s.stopped}\t${s.premature} (${pct(s.prematureRate)})\t${s.lostEvidence}\t${pct(s.medianSavedShare)}\t${s.saved.decisionPoints}\t${s.saved.toolCalls}\t${(s.saved.resultBytes / 1024).toFixed(0)}\t${s.medianLate ?? '-'}\t${(s.inputTokens / 1e6).toFixed(2)}\t${pct(s.savedInputShare)}\t${pct(s.medianSavedInputShare)}\n`
-const header = 'sessions\tsufficient\tstopped\tpremature\tlost evidence\tmedian saved share\tsaved points\tsaved calls\tsaved KiB\tmedian late\tinput Mtok\tsaved input share\tmedian saved input share\n'
+  `${label}\t${s.sessions}\t${s.reachedSufficiency}\t${s.stopped}\t${s.premature} (${pct(s.prematureRate)})\t${s.lostEvidence}\t${pct(s.medianSavedShare)}\t${s.saved.decisionPoints}\t${s.saved.toolCalls}\t${(s.saved.resultBytes / 1024).toFixed(0)}\t${s.medianLate ?? '-'}\t${(s.inputTokens / 1e6).toFixed(2)}\t${pct(s.savedInputShare)}\t${pct(s.medianSavedInputShare)}\t${pct(s.savedReadsOnlyInputShare)}\n`
+const header = 'sessions\tsufficient\tstopped\tpremature\tlost evidence\tmedian saved share\tsaved points\tsaved calls\tsaved KiB\tmedian late\tinput Mtok\tsaved input share\tmedian saved input share\tsaved input share (reads only)\n'
 const out = process.stdout
 out.write(`decider ${name}; manifest sha256 ${sha256(manifestText)}; ${scores.length} labelled sessions\n\n`)
 out.write(`arm\t${header}`)

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { DeciderFactory, SessionEvent } from '../src/decider.ts'
 import { alwaysContinue } from '../src/deciders/always-continue.ts'
-import { finishingCost, finishingPoints, lastReadPoint, replay, savedAfter, summarise, type ReplaySession } from '../src/harness.ts'
+import { finishingCost, finishingPoints, savedReadsOnlyAfter, lastReadPoint, replay, savedAfter, summarise, type ReplaySession } from '../src/harness.ts'
 import { labelParsed } from '../src/labels.ts'
 import { oracleFor } from '../src/oracle.ts'
 import { parseSession } from '../src/session.ts'
@@ -36,6 +36,8 @@ test('finishing steps are the writes and checks after the last evidence read', (
   assert.deepEqual(savedAfter(parsed, 2), { decisionPoints: 3, toolCalls: 3, resultBytes: 10 + 5 + 20, inputTokens: 300 + 400 + 500 })
   assert.deepEqual(savedAfter(parsed, 6), { decisionPoints: 0, toolCalls: 0, resultBytes: 0, inputTokens: 0 })
   assert.deepEqual(savedAfter(parsed, null), { decisionPoints: 0, toolCalls: 0, resultBytes: 0, inputTokens: 0 })
+  // The reads-only view keeps the draft write at point 4 as work still needed.
+  assert.deepEqual(savedReadsOnlyAfter(parsed, 2), { decisionPoints: 2, toolCalls: 2, resultBytes: 10 + 20, inputTokens: 300 + 500 })
   assert.deepEqual(finishingCost(parsed), { decisionPoints: 2, toolCalls: 2, resultBytes: 2 + 4, inputTokens: 600 + 700 + 800 })
 })
 

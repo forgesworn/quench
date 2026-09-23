@@ -45,6 +45,8 @@ export interface SessionScore {
   late: number | null
   finishing: Cost
   saved: Cost
+  /** The stricter view: only saved points whose calls are all reads, so interleaved edits and checks stay paid. */
+  savedReadsOnly: Cost
   savedShare: number
   /** Executor input tokens over the whole recorded session. */
   inputTokens: number
@@ -84,6 +86,20 @@ export function finishingPoints(parsed: ParsedSession): SessionPoint[] {
 /** What a stop at stopAt saves against the recorded session; a stop still pays the finishing steps. */
 export function savedAfter(parsed: ParsedSession, stopAt: number | null): Cost {
   return stopAt === null ? none : cost(parsed, stopAt, lastReadPoint(parsed))
+}
+
+/** Saved cost counting only points made of reads alone: an edit or check between the stop and the last read is kept as work still needed. */
+export function savedReadsOnlyAfter(parsed: ParsedSession, stopAt: number | null): Cost {
+  if (stopAt === null) return none
+  const lastRead = lastReadPoint(parsed)
+  const points = parsed.points.filter((point) => point.index > stopAt && point.index <= lastRead && point.calls.every((call) => call.class === 'read'))
+  return {
+    decisionPoints: points.length,
+    toolCalls: sum(points, (point) => point.calls.length),
+    resultBytes: sum(points, (point) => point.calls.reduce((total, call) => total + call.resultBytes, 0)),
+    // The message sent after point p - 1 led to point p.
+    inputTokens: sum(points, (point) => parsed.inputTokensAfter[point.index - 1] ?? 0),
+  }
 }
 
 /** Finishing cost: the points after the last read and every message sent from there on. */
@@ -131,6 +147,7 @@ export function replay(session: ReplaySession, factory: DeciderFactory): ReplayR
       late: labels.firstSufficient === null || !sufficientAtStop ? null : end - labels.firstSufficient,
       finishing: finishingCost(parsed),
       saved,
+      savedReadsOnly: savedReadsOnlyAfter(parsed, stopAt),
       savedShare: parsed.points.length ? saved.decisionPoints / parsed.points.length : 0,
       inputTokens,
       savedInputShare: inputTokens ? saved.inputTokens / inputTokens : 0,
@@ -153,6 +170,8 @@ export interface GroupSummary {
   /** Saved executor input over all the group's sessions: the cost view, where long sessions weigh most. */
   savedInputShare: number
   medianSavedInputShare: number
+  /** Saved executor input share over the group under the reads-only view. */
+  savedReadsOnlyInputShare: number
 }
 
 export const median = (values: number[]): number | null => {
@@ -189,6 +208,7 @@ export function summarise(scores: SessionScore[]): GroupSummary {
     inputTokens,
     savedInputShare: inputTokens ? sum(scores, (score) => score.saved.inputTokens) / inputTokens : 0,
     medianSavedInputShare: median(scores.map((score) => score.savedInputShare)) ?? 0,
+    savedReadsOnlyInputShare: inputTokens ? sum(scores, (score) => score.savedReadsOnly.inputTokens) / inputTokens : 0,
   }
 }
 
