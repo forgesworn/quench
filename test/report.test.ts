@@ -88,3 +88,12 @@ test('the report prints no transcript content, project names or paths', () => {
     for (const secret of [MARKER, dir, 'home']) assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false, `output contains ${secret}`)
   }
 })
+
+test('the published build runs without type stripping', () => {
+  const out = mkdtempSync(join(tmpdir(), 'quench-build-'))
+  const build = spawnSync(process.execPath, ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.build.json', '--outDir', out], { encoding: 'utf8' })
+  assert.equal(build.status, 0, build.stdout)
+  const run = spawnSync(process.execPath, [join(out, 'cli-report.js'), '--claude-root', join(out, 'none'), '--codex-root', join(out, 'none')], { encoding: 'utf8' })
+  assert.equal(run.status, 0, run.stderr)
+  assert.match(run.stdout, /No transcripts found/)
+})

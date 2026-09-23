@@ -4,3 +4,4 @@ coverage/
 results/
 quench.local.json
 quench.*.local.json
+dist/

@@ -8,20 +8,15 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "quench-labels": "src/cli-labels.ts",
-    "quench-data": "src/cli-data.ts",
-    "quench-score": "src/cli-score.ts",
-    "quench-cold": "bin/quench-cold.mjs",
-    "quench-estimate": "src/cli-estimate.ts",
-    "quench-model": "src/cli-model.ts",
-    "quench-hook": "bin/quench-hook.mjs",
-    "quench-live-check": "src/cli-live-check.ts",
-    "quench-hook-sim": "src/cli-hook-sim.ts",
-    "quench-chains": "src/cli-chains.ts",
-    "quench-report": "src/cli-report.ts"
+    "quench-report": "dist/cli-report.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "test": "node --test \"test/**/*.test.ts\"",
     "check": "npm run typecheck && npm test",
     "data": "node src/cli-data.ts",
