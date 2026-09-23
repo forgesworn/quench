@@ -633,3 +633,68 @@ What this shows, as a pilot: the frozen rule made no premature stop and lost
 no evidence on held-out tasks, and it saved input under both measures.
 Whether the saving clears 20% depends on how edits interleaved with reading
 are counted. Any claim after the Pro verdict will give both figures.
+
+## Q5 verdict: DeepSeek V4 Pro on the held-out tasks, 23 September 2026
+
+Status: **not met.** Under the protocol locked in `docs/HELDOUT.md`, the
+plain and Graphify arms fail the safety rule. The Context arm passes every
+rule, and all three arms clear the saving rule under both measures.
+
+- **Recording:** three repetitions of 8 tasks × 3 arms, 72 of 72 sessions,
+  with the private runner and the Quench hook in off mode. Checkers passed
+  69 of 72; two code changes failed the scope check.
+- **Data set:** manifest `5b38e25c…`, labels `71fa012c…`, reproducible on a
+  second build. Sessions reaching sufficiency: plain 23, Context 21,
+  Graphify 16 of 24. The frozen-code test passed before scoring.
+- **Two harness faults, both logged in the run log:**
+  - In repetition 3, the machine's Node 24.21.0 began to be killed by the
+    OS at launch (exit 137, signature valid, cause not visible; it later
+    cleared by itself). The preparer for one cell died, so the run stopped
+    at 53 of 72. The remaining 19 cells ran on Node 24.19.0, for the
+    harness, the Context server, the hook and the agent's PATH.
+  - One cell started before PATH was corrected ran without dependencies
+    installed. It was discarded before finishing and rerun.
+
+The frozen primary, `stale-5`, per arm (24 sessions each):
+
+| Rule | plain | Context | Graphify |
+| --- | --- | --- | --- |
+| Safety: at most 1 premature stop, none losing evidence | **fail**: 2 premature, 1 lost | **pass**: 0 | **fail**: 4 premature, 1 lost |
+| Saving: total executor input at least 20% | pass: 46.7% | pass: 42.8% | pass: 40.6% |
+| Reads-only view | 26.7% | 26.1% | 23.2% |
+| Oracle bound (locked / reads only) | 58.9% / 35.6% | 65.2% / 43.5% | 47.9% / 26.0% |
+
+- **Speed:** p50 7.1 µs and p99 101 µs per decision over 1,155 decisions,
+  measured with load average about 6. The protocol asks for a measurement
+  below 4; the quiet M4 measurement on the development set (p99 55 µs, cold
+  start 10.6 ms) stands meanwhile. Speed is not what fails.
+- **The six premature stops:** only two lost evidence, both on
+  orientation-commander. In plain (repetition 2) the stop came at point 9;
+  the session reached sufficiency at 29. In Graphify (repetition 1) the
+  stop came at point 25 of 40, in a session that never reached sufficiency.
+  The other four came in sessions that never gathered every declared line,
+  and the stop lost nothing those sessions later found.
+- **Breadth:** leaving out the task that saved most (code-change-commander
+  in every arm), the locked measure saves 24.5%, 19.7% and 18.7% (plain,
+  Graphify, Context), and the reads-only view 17.4%, 13.1% and 11.5%. Both
+  are above the protocol's 10% floor, so the protocol would allow wording
+  broader than "runaway sessions". Q5 is not met, so no claim is made.
+- **Where it saves:** mostly the two code-change tasks (57–84% of input
+  under the locked measure, 25–48% reads only). Diagnosis, impact and
+  orientation tasks save little or nothing.
+- **Live hook against replay:** in 69 of 72 sessions the hook withheld its
+  stop at exactly the replay stop point. In the other three, replay stops at
+  the session's final point, with no later hook call; a stop there saves
+  nothing. No hook errors.
+- **Secondary deciders:** `coverage-or-stale-5` scores identically.
+  `long20-stale-2` saves more (43.6–50.2%) but stops prematurely more
+  often (plain 3, 2 lost). `cap-30` fails as `stale-5` does.
+
+What this shows. On tasks written independently of it, the frozen rule
+saved 41 to 47% of executor input by arm, 23 to 27% even when edits and
+checks between the stop and the last read count as work still needed. It
+lost evidence in 2 of 72 sessions, both on one orientation task. The locked
+safety rule allows none, so Q5 is not met. The Context arm met every rule.
+Per GOALS, Q6 waits for a passing offline decider, so the online check does
+not run on this result. Any new rule is a new decider: it needs fresh
+held-out tasks, because it would be designed knowing these results.
