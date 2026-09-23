@@ -88,3 +88,88 @@ stop's single answer write as free where the recorded session wrote drafts
 earlier. A Bash call that re-greps citation tokens after the answer is written
 counts as a read, which slightly raises savings. With 3 to 8 sessions per task
 and arm, per-task figures are not measured differences.
+
+## Q1 amendment: citation checks are finishing steps, 23 September 2026
+
+Commit `d37138d`. A fixed-string `grep -F`/`rg -F` that confirms a citation
+token gathers nothing new, so it now counts as a check, not a read. Counting it
+as a read had overstated savings. Oracle median saved share, corrected: plain
+33.3%, graphify 20.0%, context 23.8% (was 38.9, 25.0, 25.0%); saved points
+300, 196, 303; still 0 premature. The same commit anchors path extraction on
+file extensions, bringing rule p99 from about 1.4 ms to under 0.3 ms.
+
+## Q2: deterministic decider, 23 September 2026
+
+Status: **not met**. No variant meets the locked thresholds. The best variant,
+`coverage-or-stale-5`, meets the premature-stop and latency thresholds in
+every arm but saves 0% of points at the median in every arm.
+
+Thresholds (committed in `src/deciders/variants.ts` at `7cd1437` before any
+scoring): premature stops at most 5% of sessions per arm; median saved share
+at least 20% per arm; p50 under 0.1 ms and p99 under 1 ms per decision; cold
+start under 30 ms. Batch 1 was locked at `7cd1437` and batch 2 at `03a83ce`,
+each before it was scored. The figures below are from `8cfaf9a` (harness as
+amended at `d37138d`, plus a lost-evidence column), manifest `bf58b944`,
+`node src/cli-score.ts --decider <variant> --cold 30`. All variants require a
+test file and an implementation file to have been read, except
+`coverage-clean`.
+
+Each cell gives stopped / premature (lost evidence) / median saved share.
+"Lost evidence" counts stops that missed tokens the recorded session found
+later; the remaining premature stops fell in sessions that never reached
+sufficiency.
+
+| Variant | Rule | plain (37) | graphify (37) | context (43) |
+| --- | --- | --- | --- | --- |
+| `stale-3` | 3 points with no new file read or listed | 28 / 4 (1) / 0% | 22 / 2 (0) / 0% | 26 / 5 (1) / 0% |
+| `stale-5` | 5 such points | 11 / 1 (0) / 0% | 9 / 1 (0) / 0% | 17 / 2 (0) / 0% |
+| `terms-stale-2` | prompt identifiers seen, 2 stale points | 32 / 4 (1) / 0% | 29 / 2 (1) / 0% | 33 / 6 (1) / 7.7% |
+| `coverage-clean` | coverage reports 0 missing (no test gate) | 0 / 0 / 0% | 0 / 0 / 0% | 7 / 0 (0) / 0% |
+| `repeat` | an identical read repeated | 2 / 0 / 0% | 0 / 0 / 0% | 2 / 0 / 0% |
+| `read-stale-2` | 2 points with no new file *read* | 37 / 7 (4) / 10.0% | 35 / 3 (1) / 0% | 36 / 5 (1) / 0% |
+| `read-stale-3` | 3 such points | 32 / 5 (2) / 0% | 25 / 2 (0) / 0% | 28 / 4 (1) / 0% |
+| `coverage-or-stale-5` | clean coverage or 5 stale points | 11 / 1 (0) / 0% | 9 / 1 (0) / 0% | 20 / 2 (0) / 0% |
+
+Premature rates: `stale-5` and `coverage-or-stale-5` 2.7, 2.7, 4.7%; every
+other stopping variant exceeds 5% in at least one arm. Before the Q1
+amendment, batch 1 scored at `7cd1437` gave the same stops except small
+differences in `stale-3` and `stale-5` from the old path extractor; its
+premature counts were identical and every median saved share was also 0%.
+
+Best variant, `coverage-or-stale-5`, in more detail:
+
+- Saved points 77, 65, 83 (plain, graphify, context) against the oracle's
+  300, 196, 303, about a quarter to a third of the bound. Mean saved share
+  4.3, 4.0, 6.0% against the oracle's 35.0, 24.3, 31.5%. Where it stops, it
+  saves 14.1% of the session on average.
+- Per task, median saved share is non-zero only on diagnosis-context (plain
+  3.4%, graphify 14.8%, context 20.5%). Per run, only v3 coverage context is
+  non-zero at the median (7.9%, with 6 of 6 stopped, all through clean
+  coverage or staleness). Its 4 premature stops are in v1 (context,
+  graphify), v2 plain and Pro r1 context, spread across orientation tasks.
+- Latency over 1,794 decisions: p50 9.9 µs, p99 171 µs. Cold start, 60 runs
+  on a loaded machine (load average 12): median 21.4 ms from time origin to
+  first decision, 32.6 ms wall from spawn to exit.
+- Leakage: `test/leakage.test.ts` checks that `src/deciders/` imports only
+  the decider interface and `session.ts` (no labels, data, harness, oracle or
+  file system), and that decisions are identical whatever evidence is
+  declared.
+
+Cause: the threshold is close to the bound. Net of finishing steps, the
+oracle's median saved share is 20.0% for graphify and 23.8% for context, so a
+rule meets 20% only by stopping within about a point of sufficiency in more
+than half of all sessions. Novelty signals (no new file, a repeated read, a
+clean coverage report) fire late: median lateness 4 to 6.5 points where they
+fire, and not at all in most sessions. Loosening them to fire sooner raises
+premature stops above 5% before the median saving leaves zero
+(`read-stale-2`: plain 18.9% premature for a 10% median). Sufficiency here
+means the agent has seen particular lines of implementation and tests;
+file-level novelty does not detect that. Per GOALS, Q3 (a typed model
+decider) is the next step; it needs a cost estimate approved by the owner
+before it runs.
+
+Limitations: all tasks were used to tune Context, and each rule was designed
+with knowledge of the batch 1 scores (batch 2 only). With 6 to 8 sessions per
+task and arm, per-task figures are not measured differences. The literal
+premature definition counts a stop in a session that never became sufficient
+as premature even where the recorded agent itself gave up.
