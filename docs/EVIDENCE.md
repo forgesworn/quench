@@ -18,19 +18,22 @@ figure.
 
 ## Q0: frozen data set, 23 September 2026
 
-Status: **in progress** (met for the eight completed runs; the Context 0.4.0
-screen `20260923-screen-pro-040` was still recording and is added when it
-completes). Commit `f69f08f`, `node src/cli-data.ts`, run twice: manifest and
-labels byte-identical.
+Status: **met**. `node src/cli-data.ts`, run three times over the eleven runs
+below: manifest and labels byte-identical each time.
 
-- Manifest sha256 `bf58b944b56f5838f2c47c77d450db7776c989ec96575e08e549697b5f61ea73`,
-  labels sha256 `a122bfd8b83b496224c009b0878da5d10dc670705b6b7ea65ded6b3ee5d3e0e3`.
+- Manifest sha256 `007d120c3b0a6ad56be6ca37ad91c075860808147a056070dbd4d2ec191d2788`,
+  labels sha256 `66384806b0ee7bb8abf21a2a8ee5638c1ac67f40577aa0d35c4622a1d5789ded`.
 - Acceptance: `d5-20260921/acceptance` from the Context experiments; its
   required evidence is identical in the rubric v2 and v3 copies.
-- 158 sessions: 117 labelled, 41 unlabelled (code-change tasks, no declared
-  evidence: v1 6, v2 6, S5 6, v3 2, Flash 3, Pro r1 to r3 6 each), and 9
-  excluded (`invalid-runs/` under v1: aborted pilots with no permission
-  bypass, unused tools or an unresolvable Graphify CLI).
+- 182 sessions: 135 labelled, 47 unlabelled (code-change tasks, no declared
+  evidence: v1 6, v2 6, S5 6, v3 2, Flash 3, Pro r1 to r3 6 each, Context
+  0.4.0 screen r1 to r3 2 each), and 9 excluded (`invalid-runs/` under v1:
+  aborted pilots with no permission bypass, unused tools or an unresolvable
+  Graphify CLI).
+- The first freeze (commit `f69f08f`, manifest `bf58b944…`, labels
+  `a122bfd8…`) held the eight runs without the Context 0.4.0 screen: 158
+  sessions, 117 labelled. Q1 to Q4 below were scored against it; see the
+  re-score note at the end.
 - **Correction:** the starting-headroom entry counted 126 sessions because its
   directory walk picked up those 9 invalid pilot cells. The true labelled count
   is 117.
@@ -47,8 +50,11 @@ Labelled sessions per run and arm, with the number that reached sufficiency:
 | Pro r1 | 6 (6) | 6 (5) | 6 (5) |
 | Pro r2 | 6 (6) | 6 (6) | 6 (5) |
 | Pro r3 | 6 (6) | 6 (6) | 6 (5) |
+| Context 0.4.0 screen r1 | | | 6 (4) |
+| Context 0.4.0 screen r2 | | | 6 (6) |
+| Context 0.4.0 screen r3 | | | 6 (5) |
 
-Per task (all runs, by arm): diagnosis-context 6 (6), 6 (6), 7 (7);
+Per task (the first freeze, by arm): diagnosis-context 6 (6), 6 (6), 7 (7);
 diagnosis-kithmoot 6 (4), 6 (6), 7 (3); impact-context 6 (6), 6 (5), 7 (6);
 impact-kithmoot 6 (6), 6 (6), 7 (7); orientation-context 7 (6), 7 (6), 8 (7);
 orientation-kithmoot 6 (5), 6 (6), 7 (6).
@@ -300,3 +306,17 @@ Limitations: one prompt and one summary size were tried; the summary shows
 the answer write, which invites agreement with the agent's own stop. A
 variant that hides the agent's writes and checks would be a new locked
 variant with its own approved pass.
+
+## Re-score on the full freeze, 23 September 2026
+
+Adding the Context 0.4.0 screen (manifest `007d120c…`, 135 labelled sessions)
+changes no conclusion. The added sessions are all in the context arm.
+
+- Oracle: median saved share plain 33.3%, graphify 20.0%, context 23.3%
+  (was 23.8%); 0 premature.
+- `coverage-or-stale-5`: premature 1/1/3 of 37/37/61 (2.7%, 2.7%, 4.9%), 0
+  lost evidence, median saved 0% in every arm, saved points 77/65/200.
+  Decision p50 9.8 µs, p99 113 µs. Q2 stays not met.
+- The Q3 model decider was not re-scored: the 18 new sessions would need a
+  further hosted pass, which was not approved. Laya was not re-run either; its
+  result on the first freeze already rules it out.
