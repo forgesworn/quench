@@ -70,3 +70,48 @@ The recording harness has to install the hook in the executor's Claude Code
 settings and set `QUENCH_HINT` and `QUENCH_STATE_DIR` per session, keeping
 each session's hook log with its receipt. That change belongs to the harness
 owner's repository and is not made from here.
+
+## Amendment 1: the Context arm only, 23 September 2026
+
+Locked before any session with the hint on. The owner chose to run the online
+check where the held-out result passed. Under `docs/HELDOUT.md`, Q5 was not
+met overall: plain and Graphify failed the safety rule. The Context arm met
+every rule (no premature stop, 42.8% of executor input saved, 26.1% under
+the reads-only view). This amendment replaces the gate "Q5 is met" with
+"Q5 is met in the arm under test". Every result is reported as a Context-arm
+result only.
+
+- **Arm:** Context only.
+- **Tasks and executor:** the eight held-out tasks, DeepSeek V4 Pro, with
+  the private runner and settings used for the Q5 Pro pass.
+- **Decider and hint:** the frozen `stale-5` (hashes in `docs/HELDOUT.md`)
+  and the hint text in `src/hook.ts` at the commit recorded in each receipt.
+- **Conditions:** hint on (`QUENCH_HINT=on`) and hint off
+  (`QUENCH_HINT=off`), both fresh sessions. Three repetitions per task and
+  condition, 48 sessions in all. Within each task and repetition the two
+  conditions run back to back, and the first condition alternates between
+  tasks and repetitions.
+- **Failures:** a session that fails to run is logged and rerun once. A
+  session that runs and gives a wrong answer is kept.
+
+**Pass rule (Context arm):**
+
+1. **Cost:** total executor input with the hint on is at least 20% lower
+   than with it off.
+2. **Quality:** accepted sessions with the hint on are no fewer than with it
+   off.
+
+Also reported:
+
+- per-task medians and spread;
+- turns, tool calls and wall time;
+- the hint's delivery point, and how many decision points each agent took
+  after it before its last read;
+- evidence labels for the hint-on sessions (whether an agent stopped before
+  sufficiency after the hint);
+- the 24 Context sessions from the Q5 Pro pass (hint off), as a further
+  reference that is not interleaved.
+
+**Estimate:** 48 sessions at about 0.68M executor input each, about 33M
+input and 0.7M output, about 2.4 hours sequential. The owner approved
+DeepSeek spend for this programme.
