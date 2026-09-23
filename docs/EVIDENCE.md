@@ -204,7 +204,9 @@ Estimate for one full scoring pass, upper bound (every gated point asked):
 
 ## Q4: Jev and Laya as comparators, 23 September 2026
 
-Status: **in progress**. Laya scored; Jev awaits the owner's approval.
+Status: **met**. Laya scored (not useful as a stopper); Jev not scored
+because it is unavailable: the owner reports TypeSafe AI is not accepting new
+accounts (23 September 2026).
 
 How each runs (public pages, read 23 September 2026):
 
@@ -216,7 +218,8 @@ How each runs (public pages, read 23 September 2026):
   output free. Scoring it on the 2,070 distinct snapshots the Laya adapter
   sends (3.47M characters, about 0.87M tokens, plus the fixed question) comes
   to about 0.95M input tokens, roughly $0.04 per pass at the published price.
-  It needs an early-access account, so not run.
+  It needs an early-access account, and new accounts are closed, so it was
+  not run.
 
 The adapters live in `comparators/` and import no Quench decider code
 (`test/leakage.test.ts`). Each snapshot is the task prompt (700 characters)
