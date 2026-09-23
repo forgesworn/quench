@@ -1,8 +1,8 @@
 # Long-session protocol (Q8)
 
-Draft, 23 September 2026. It is locked by the commit that fills in the pack
-and runner hashes below, before the first pilot session. After that only
-logged harness fixes may change, and never the pass rules.
+Locked 24 September 2026 by the commit that filled in the pack and runner
+hashes below, before the first pilot session. After that only logged
+harness fixes may change, and never the pass rules.
 
 ## Question
 
@@ -30,8 +30,20 @@ small. The quality cost is unmeasured, and this protocol measures it.
   - Each step has a deterministic checker, proved against reference
     outcomes and wrong variants, including one "forgotten dependency"
     variant per step.
-  - Pack: `~/.cache/quench-heldout/chains-20260923/` (private). Hashes:
-    `SHA256SUMS` sha256 `TBD`, `protocol-chains.json` sha256 `TBD`.
+  - Steps, commander: 1 orientation (`.choices()`), 2 diagnosis of a
+    seeded fault, 3 repair with regression tests, 4 impact (suggesting the
+    closest choice), 5 the change from step 4, 6 report. markdown-it: 1
+    orientation (GFM tables), 2 diagnosis of a seeded fault, 3 repair with
+    a fixture and cell maps, 4 impact (a `tableAlign` option), 5 the change
+    from step 4, 6 report.
+  - Proofs: 12 of 12 references and 6 of 6 independence proofs accepted, 37
+    of 37 wrong variants rejected, each forgotten-dependency variant for
+    the intended reason. `verify.mjs` passes on this machine.
+  - Pack: `~/.cache/quench-heldout/chains-20260923/` (private), protocol
+    `quench-heldout-chains-20260923-v1`. Hashes: `SHA256SUMS` sha256
+    `aa4f033e91259d08f7650a193f96247e2adf37f04ea267e99b3bca6dfaf6510e`,
+    `protocol-chains.json` sha256
+    `2dd1b1d6d867ac867470640aeeb0c5665b61ee9d492ded0820c7eec86f0cad83`.
 - **Executor:** DeepSeek V4 Pro (`deepseek-v4-pro:cloud`) through the local
   Anthropic-compatible route, with every Claude Code flag, setting and
   disallowed tool from the Q5 held-out protocol, and the plain-arm retrieval
@@ -41,6 +53,11 @@ small. The quality cost is unmeasured, and this protocol measures it.
   `--session-id`; steps 2–6 continue it with `--resume`. Each step's prompt
   is the locked step prompt after the line "Step n of 6 in this session."
   Each step's checker runs as soon as the step finishes.
+- **Context window:** every arm sets `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000`.
+  Both DeepSeek models report a context length of 1,048,576, and Claude Code
+  gives Sonnet 5 and Opus 5 a 1M window. Without it, Claude Code assumes
+  200K for a model it does not know and compacts to stay within it, which
+  would make carry compact as well.
 - **Policies (arms):**
   - **carry:** `DISABLE_AUTO_COMPACT=1`. The session carries everything.
   - **threshold:** `CLAUDE_CODE_AUTO_COMPACT_WINDOW=100000`, the smallest
@@ -49,8 +66,11 @@ small. The quality cost is unmeasured, and this protocol measures it.
   - **boundary:** `DISABLE_AUTO_COMPACT=1`, and the harness runs `/compact`
     in the same session after steps 1 to 5. That invocation alone omits
     `--disable-slash-commands`, which otherwise blocks `/compact`.
-- **Runner:** `runner/chain.mjs` (sha256 `TBD`) and `runner/chains-all.mjs`
-  (sha256 `TBD`), private, beside the Q5 runner.
+- **Runner:** `runner/chain.mjs` (sha256
+  `289223639419edd4c608866c1e7527c53aa3f5e9019d050ae446c20e8f6ae220`) and
+  `runner/chains-all.mjs` (sha256
+  `d8293e07acc59f92028647ed96756ee0c499ba0f9108470d23aa531fcdead911`),
+  private, beside the Q5 runner.
 - **Repetitions and order:** three repetitions of each chain and policy, so
   18 chain runs and 108 steps. Within each repetition and chain the three
   policies run back to back. Which policy goes first rotates by repetition
@@ -110,6 +130,14 @@ Reading the result:
   be judged.
 - Two chains on two repositories are a small sample; per-chain results are
   reported separately.
+- Earlier answer files and code edits stay in the workspace, so after a
+  compaction the agent can read its earlier results again, as it could in
+  a real session. The test is whether it does so correctly and at what
+  cost, not whether it can recall them unaided.
+- The pack's author lists further weaknesses in its private README: strict
+  answer formats, one reading of each requirement in the probes, step-5
+  prompts that restate the behaviour step 4 analysed, and a markdown-it
+  fault that breaks existing fixtures and may be noticed in step 1.
 - DeepSeek, not Claude. A Claude confirmation needs its own estimate and the
   owner's approval to spend.
 
