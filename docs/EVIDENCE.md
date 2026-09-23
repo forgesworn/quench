@@ -642,7 +642,8 @@ rule, and all three arms clear the saving rule under both measures.
 
 - **Recording:** three repetitions of 8 tasks × 3 arms, 72 of 72 sessions,
   with the private runner and the Quench hook in off mode. Checkers passed
-  69 of 72; two code changes failed the scope check.
+  66 of 72 and two code changes failed the scope check, so 64 were
+  accepted: plain 24, Context 22, Graphify 18 of 24.
 - **Data set:** manifest `5b38e25c…`, labels `71fa012c…`, reproducible on a
   second build. Sessions reaching sufficiency: plain 23, Context 21,
   Graphify 16 of 24. The frozen-code test passed before scoring.
