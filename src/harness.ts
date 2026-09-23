@@ -36,6 +36,8 @@ export interface SessionScore {
   stopAt: number | null
   reason: string | null
   premature: boolean
+  /** The stop missed evidence tokens the recorded session found later (a premature stop that cost something). */
+  lostEvidence: boolean
   late: number | null
   finishing: Cost
   saved: Cost
@@ -108,6 +110,7 @@ export function replay(session: ReplaySession, factory: DeciderFactory): ReplayR
       stopAt,
       reason,
       premature: !sufficientAtStop,
+      lostEvidence: stopAt !== null && (labels.points[stopAt - 1]?.found ?? 0) < labels.found,
       late: labels.firstSufficient === null || !sufficientAtStop ? null : end - labels.firstSufficient,
       finishing: cost(finishingPoints(parsed)),
       saved,
@@ -123,6 +126,7 @@ export interface GroupSummary {
   stopped: number
   premature: number
   prematureRate: number
+  lostEvidence: number
   medianSavedShare: number
   saved: Cost
   medianLate: number | null
@@ -149,6 +153,7 @@ export function summarise(scores: SessionScore[]): GroupSummary {
     stopped: scores.filter((score) => score.stopAt !== null).length,
     premature,
     prematureRate: scores.length ? premature / scores.length : 0,
+    lostEvidence: scores.filter((score) => score.lostEvidence).length,
     medianSavedShare: median(scores.map((score) => score.savedShare)) ?? 0,
     saved: {
       decisionPoints: sum(scores, (score) => score.saved.decisionPoints),

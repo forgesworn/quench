@@ -40,8 +40,8 @@ for (const loaded of loadSessions(config, manifest)) {
 
 const pct = (value: number): string => `${(value * 100).toFixed(1)}%`
 const row = (label: string, s: GroupSummary): string =>
-  `${label}\t${s.sessions}\t${s.reachedSufficiency}\t${s.stopped}\t${s.premature} (${pct(s.prematureRate)})\t${pct(s.medianSavedShare)}\t${s.saved.decisionPoints}\t${s.saved.toolCalls}\t${(s.saved.resultBytes / 1024).toFixed(0)}\t${s.medianLate ?? '-'}\n`
-const header = 'sessions\tsufficient\tstopped\tpremature\tmedian saved share\tsaved points\tsaved calls\tsaved KiB\tmedian late\n'
+  `${label}\t${s.sessions}\t${s.reachedSufficiency}\t${s.stopped}\t${s.premature} (${pct(s.prematureRate)})\t${s.lostEvidence}\t${pct(s.medianSavedShare)}\t${s.saved.decisionPoints}\t${s.saved.toolCalls}\t${(s.saved.resultBytes / 1024).toFixed(0)}\t${s.medianLate ?? '-'}\n`
+const header = 'sessions\tsufficient\tstopped\tpremature\tlost evidence\tmedian saved share\tsaved points\tsaved calls\tsaved KiB\tmedian late\n'
 const out = process.stdout
 out.write(`decider ${name}; manifest sha256 ${sha256(manifestText)}; ${scores.length} labelled sessions\n\n`)
 out.write(`arm\t${header}`)

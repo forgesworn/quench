@@ -49,6 +49,7 @@ test('always continue saves nothing and is late by the whole tail', () => {
   const { score, decisionNs } = replay(session, alwaysContinue)
   assert.equal(score.stopAt, null)
   assert.equal(score.premature, false)
+  assert.equal(score.lostEvidence, false)
   assert.deepEqual(score.saved, { decisionPoints: 0, toolCalls: 0, resultBytes: 0 })
   assert.equal(score.late, 5)
   assert.equal(decisionNs.length, 7)
@@ -57,6 +58,7 @@ test('always continue saves nothing and is late by the whole tail', () => {
 test('a stop before sufficiency is premature and ends the replay there', () => {
   const { score, decisionNs } = replay(session, stopAt(1))
   assert.equal(score.premature, true)
+  assert.equal(score.lostEvidence, true)
   assert.equal(score.late, null)
   assert.equal(decisionNs.length, 1)
   assert.equal(summarise([score, replay(session, oracleFor(labels)).score]).prematureRate, 0.5)
