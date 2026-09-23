@@ -3,6 +3,8 @@
 // off the hot path and the harness replays its recorded answers.
 export const modelSettings = {
   model: 'deepseek-v4.1-flash:cloud',
+  /** Bumped whenever the request changes, so recorded answers are never reused across versions. */
+  promptVersion: 2,
   think: false,
   temperature: 0,
   summaryChars: 12000,
@@ -28,7 +30,9 @@ const system = `You judge whether a coding agent has gathered enough evidence to
 You see the task and a summary of the agent's session so far: files read, the newest tool results and the calls made.
 Answer "stop" only if the tool results already contain everything the task asks for, including the implementation and focused tests it must cite.
 If anything the task asks about has not yet been read, answer "continue" and list what is missing (short phrases).
-A premature stop is far worse than one extra tool call. Reply with JSON only.`
+A premature stop is far worse than one extra tool call.
+Reply with exactly this JSON object and nothing else: {"decision": "stop" | "continue", "missing": [string, ...]}
+Use the key "decision" (not "verdict") and give "missing": [] when you answer "stop".`
 
 export function modelMessages(summary: string): Array<{ role: 'system' | 'user'; content: string }> {
   return [

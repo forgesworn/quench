@@ -18,7 +18,7 @@ export interface RecordedAnswer {
   ms: number
 }
 
-export const summaryKey = (summary: string): string => createHash('sha256').update(`${modelSettings.model}\n${summary}`).digest('hex')
+export const summaryKey = (summary: string): string => createHash('sha256').update(`${modelSettings.model}\n${modelSettings.promptVersion}\n${summary}`).digest('hex')
 
 export function readAnswers(path: string): Map<string, RecordedAnswer> {
   if (!existsSync(path)) return new Map()
