@@ -12,6 +12,7 @@ import { comparators } from '../comparators/index.ts'
 import { deciders } from './deciders/index.ts'
 import { groupBy, median, percentile, replay, type GroupSummary, type SessionScore } from './harness.ts'
 import { labelParsed } from './labels.ts'
+import { modelReplay } from './model-replay.ts'
 import { oracleFor } from './oracle.ts'
 import { parseSession } from './session.ts'
 
@@ -22,7 +23,7 @@ const option = (name: string): string | undefined => {
 }
 const name = option('--decider') ?? ''
 const config = loadConfig(option('--config'))
-const available: Record<string, DeciderFactory> = { ...deciders, ...comparators(config.out) }
+const available: Record<string, DeciderFactory> = { ...deciders, ...comparators(config.out), 'model-flash': modelReplay(join(config.out, 'model-answers.jsonl')) }
 if (name !== 'oracle' && !available[name]) throw new Error(`--decider must be oracle or one of: ${Object.keys(available).join(', ')}`)
 const manifestText = readFileSync(join(config.out, 'manifest.json'), 'utf8')
 const manifest = JSON.parse(manifestText) as Manifest

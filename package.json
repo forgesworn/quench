@@ -12,7 +12,8 @@
     "quench-data": "src/cli-data.ts",
     "quench-score": "src/cli-score.ts",
     "quench-cold": "bin/quench-cold.mjs",
-    "quench-estimate": "src/cli-estimate.ts"
+    "quench-estimate": "src/cli-estimate.ts",
+    "quench-model": "src/cli-model.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
