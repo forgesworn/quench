@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Score a decider on the frozen data set built by quench-data.
-// Usage: quench-score --decider <name|oracle> [--config quench.local.json] [--cold <runs>]
+// Usage: quench-score --decider <name|oracle|comparator> [--config quench.local.json] [--cold <runs>]
 // Prints per-arm, per-run and per-task tables and decision latency; writes
 // <out>/score-<name>.json with every session's score.
 import { spawnSync } from 'node:child_process'
@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ignoreTokens, loadConfig, loadSessions, sha256, type Manifest } from './data.ts'
 import type { DeciderFactory } from './decider.ts'
+import { comparators } from '../comparators/index.ts'
 import { deciders } from './deciders/index.ts'
 import { groupBy, median, percentile, replay, type GroupSummary, type SessionScore } from './harness.ts'
 import { labelParsed } from './labels.ts'
@@ -20,8 +21,9 @@ const option = (name: string): string | undefined => {
   return at >= 0 ? args[at + 1] : undefined
 }
 const name = option('--decider') ?? ''
-if (name !== 'oracle' && !deciders[name]) throw new Error(`--decider must be oracle or one of: ${Object.keys(deciders).join(', ')}`)
 const config = loadConfig(option('--config'))
+const available: Record<string, DeciderFactory> = { ...deciders, ...comparators(config.out) }
+if (name !== 'oracle' && !available[name]) throw new Error(`--decider must be oracle or one of: ${Object.keys(available).join(', ')}`)
 const manifestText = readFileSync(join(config.out, 'manifest.json'), 'utf8')
 const manifest = JSON.parse(manifestText) as Manifest
 
@@ -31,7 +33,7 @@ const nsByArm = new Map<string, number[]>()
 for (const loaded of loadSessions(config, manifest)) {
   const parsed = parseSession(loaded.stream, loaded.prompt)
   const labels = labelParsed(parsed, loaded.required, { ignoreTokens })
-  const factory: DeciderFactory = name === 'oracle' ? oracleFor(labels) : deciders[name] as DeciderFactory
+  const factory: DeciderFactory = name === 'oracle' ? oracleFor(labels) : available[name] as DeciderFactory
   const { score, decisionNs } = replay({ run: loaded.meta.run, cell: loaded.meta.cell, task: loaded.meta.task, arm: loaded.meta.arm, parsed, labels }, factory)
   scores.push(score)
   allNs.push(...decisionNs)
@@ -58,7 +60,7 @@ for (const [arm, ns] of [...nsByArm].sort(([a], [b]) => a.localeCompare(b))) out
 
 const coldRuns = Number(option('--cold') ?? 0)
 let cold: { runs: number; medianOriginMs: number | null; maxOriginMs: number; medianWallMs: number | null } | null = null
-if (coldRuns > 0 && name !== 'oracle') {
+if (coldRuns > 0 && deciders[name]) {
   const origin: number[] = []
   const wall: number[] = []
   for (let i = 0; i < coldRuns; i += 1) {

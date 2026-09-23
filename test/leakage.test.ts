@@ -52,3 +52,16 @@ test('decisions do not change when required evidence, labels or acceptance chang
     assert.deepEqual(run(name), before, name)
   }
 })
+
+test('comparators import no Quench decider code, labels or harness internals', () => {
+  const dir = join(import.meta.dirname, '..', 'comparators')
+  const files = ['snapshot.ts', 'index.ts', 'laya/decider.ts', 'laya/export.ts']
+  for (const file of files) {
+    for (const spec of importsOf(join(dir, file))) {
+      assert.ok(!/src\/deciders\/|labels\.ts|harness\.ts|oracle\.ts/.test(spec), `comparators/${file} imports ${spec}`)
+    }
+  }
+  for (const file of ['snapshot.ts', 'laya/decider.ts']) {
+    for (const spec of importsOf(join(dir, file))) assert.ok(/^(node:crypto|node:fs|\.\.\/(\.\.\/)?src\/decider\.ts|\.\.?\/[\w/-]+\.ts)$/.test(spec) && !spec.includes('data.ts'), `comparators/${file} imports ${spec}`)
+  }
+})
