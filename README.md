@@ -115,3 +115,7 @@ prints nothing (the control arm). Decisions and hints are logged to
 Evidence directories hold one cell per session: `receipt.json` (task, arm,
 accepted), `executor.prompt.txt` and `executor.stream.jsonl`. Recorded evidence
 stays private and outside this repository; `results/` is untracked.
+
+## Licence
+
+MIT
