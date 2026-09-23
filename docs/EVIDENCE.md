@@ -404,3 +404,28 @@ load (load average 40 to 70): `stale-5` p50 12 to 13 µs, p99 254 to 468 µs,
 cold start median 28 to 34 ms over 20 runs. The quiet-machine figures from Q2
 (p99 171 µs, cold start about 21 ms) stand until a re-measurement at low load
 is recorded.
+
+## Q6 groundwork: the stop-hint hook, 23 September 2026
+
+Status: groundwork only; Q6 itself waits for Q5. Commit `5feaca1`.
+
+- `src/live.ts` feeds a growing Claude Code transcript to a decider and
+  decides once per decision point. `node src/cli-live-check.ts`: on all 135
+  labelled sessions, fed in random chunks of 1 to 4,096 characters, the live
+  path made the same decision as replay at every point for all 13 registered
+  deciders (31,902 decisions).
+- `bin/quench-hook.mjs` is a `PostToolUse` hook. The first call in a session
+  decides in process and starts a per-session background process. That
+  process keeps the frozen `stale-5` decider in memory and reads only the
+  bytes appended since the last call, so a decision costs the same at turn 5
+  and turn 80.
+- `node src/cli-hook-sim.ts` drove the real hook binary over all 135 sessions,
+  appending the transcript line by line and calling the hook after each tool
+  result (2,961 calls). The hint arrived at the replay stop point in 135 of
+  135 sessions. Time from process start to decision: median 23.7 ms, p99
+  56.0 ms, with the machine under heavy unrelated load (load average about
+  45). A quiet-machine figure is pending.
+- Tests: the hook delivers one hint at the stop point and logs it; with
+  `QUENCH_HINT=off` it prints nothing and logs the withheld hint; the leakage
+  test covers the live path.
+- Protocol for the online check: `docs/ONLINE.md` (locked with its estimate).

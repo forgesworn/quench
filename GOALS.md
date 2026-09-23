@@ -178,7 +178,9 @@ executor).
 
 **Done when:** the tasks are locked and hashed, sessions are recorded, and
 the Q2 or Q3 decider is scored on them without any change after it has seen
-them.
+them. The decider, measures and pass rule are locked in
+[docs/HELDOUT.md](docs/HELDOUT.md); the brief for the task-writing session is
+[docs/HANDOFF-Q5.md](docs/HANDOFF-Q5.md).
 
 ### Q6: The online check
 
@@ -189,7 +191,8 @@ executor input, turns and acceptance.
 
 **Done when:** a prospectively locked rule is met, for example at least 20%
 lower median input with no fewer accepted tasks, or the result is recorded as
-not met, with the per-task spread.
+not met, with the per-task spread. The locked rule is in
+[docs/ONLINE.md](docs/ONLINE.md).
 
 ### Q7: Packaging (only after Q6 passes)
 
