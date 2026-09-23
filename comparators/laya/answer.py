@@ -15,12 +15,12 @@ QUESTION = {
     }
 }
 
-router = Router(model="english", preload=True)
+router = Router(default="english", preload=True)
 started = time.time()
 with open(sys.argv[1]) as src, open(sys.argv[2], "w") as out:
     for n, line in enumerate(src, 1):
         row = json.loads(line)
-        result = router.predict({"body": row["snapshot"]}, QUESTION)
+        result = router.predict({"body": row["snapshot"]}, QUESTION, model="english")
         out.write(json.dumps({"key": row["key"], "p": float(result["answers"]["enough_evidence"]["noul"])}) + "\n")
         if n % 200 == 0:
             print(n, "answered", round(time.time() - started, 1), "s", file=sys.stderr)
