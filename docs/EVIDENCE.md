@@ -177,8 +177,9 @@ as premature even where the recorded agent itself gave up.
 
 ## Q3: typed model decider, 23 September 2026
 
-Status: **planned, awaiting the owner's approval of the estimate**. Q2 fell
-short, so Q3 applies. Nothing has been run and no model has been called.
+Status: **not met; recorded as not useful**. The owner approved one pass on
+23 September 2026. Results are under "Q3 result" below; the plan and estimate
+follow as approved.
 
 Commit `7806824` adds the bounded, run-time-only summary
 (`src/deciders/summary.ts`: task prompt, files read with tests marked, the
@@ -248,3 +249,54 @@ come almost entirely from premature stops, so they are not comparable with
 the rules'. Limitations: a 1,900-character snapshot is near Laya's 512-token
 input and code-heavy text may be truncated (not measured); one question with
 a fixed threshold does not test Laya's other question types.
+
+### Q3 result
+
+Commits `057fae1` (decider locked) and `40392ea` (answer shape stated in the
+prompt, answer key versioned), `node src/cli-model.ts` then
+`node src/cli-score.ts --decider model-flash`, manifest `bf58b944`. Model
+`deepseek-v4.1-flash:cloud` through the local Ollama 0.34.2 route, thinking
+off, temperature 0.
+
+Failed attempts, logged: (1) the first smoke session, 14 calls, 23,584 input
+and 1,313 output tokens. The route did not enforce the JSON schema, so Flash
+answered `{verdict, reason}` and 13 of 14 answers did not parse. Fixed by
+stating the shape in the prompt; those answers are kept aside and never
+reused. (2) The full pass stopped after 19 sessions on one HTTP 500
+(`Internal Server Error`, not a refusal or spending hold). The failed call
+recorded no answer, and one resume completed the pass without re-asking any
+point.
+
+Spend: 1,158 answers (all parsed), 1,886,906 input and 95,598 output tokens,
+plus the failed attempt's 24,897; within the approved estimate for input,
+about 27% over it for output. Model latency p50 0.91 s, p99 3.3 s per call:
+off the hot path only, as GOALS requires.
+
+| Arm | Sessions | Stopped | Premature (lost evidence) | Median saved share | Saved points | Saved calls | Saved KiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| plain | 37 | 32 | 2 (0) | 0% | 5 | 5 | 2 |
+| graphify | 37 | 32 | 2 (0) | 0% | 6 | 6 | 3 |
+| context | 43 | 20 | 1 (0) | 0% | 3 | 3 | 0 |
+
+Every run and task has a 0% median saved share. The 5 premature stops are all
+in sessions that never reached sufficiency (v1 context and graphify, v2 plain
+twice, Pro r1 graphify) and lost no evidence.
+
+Net of its own tokens it is a loss. Estimated executor input avoided (each
+skipped turn resends the prompt and every tool result so far; bytes / 4,
+ignoring caching and assistant text): plain 255K, graphify 235K, context 57K
+tokens, 547K in total, against the decider's 1.89M. The same estimate puts
+the oracle's bound at 9.6M, 5.9M and 6.3M.
+
+Why: the model says stop almost only once the agent has itself finished
+reading. Of its 84 stops, 78 came at or after the session's last evidence
+read, and all 84 came after a write or check (an answer draft, a coverage
+check, a citation grep) had appeared in the summary. It is safe but does not anticipate sufficiency. It does not beat
+the best Q2 rule (`coverage-or-stale-5`: 77, 65, 83 saved points at 2.7,
+2.7, 4.7% premature) on saved points. Per GOALS, Q3 is recorded as not
+useful. No further pass has been run or is proposed.
+
+Limitations: one prompt and one summary size were tried; the summary shows
+the answer write, which invites agreement with the agent's own stop. A
+variant that hides the agent's writes and checks would be a new locked
+variant with its own approved pass.
