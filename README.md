@@ -14,7 +14,7 @@ saving yet.
 ## Why
 
 Recorded sessions from the [Context](https://github.com/forgesworn/context)
-retrieval experiments (126 sessions with declared required evidence, three
+retrieval experiments (117 sessions with declared required evidence, three
 tool arms, Sonnet and DeepSeek executors) show that in every arm roughly half
 of a session's decision points come **after** all required evidence had
 already appeared in tool results (median share: plain 0.57, Graphify 0.40,

@@ -15,7 +15,7 @@ what the benchmark measured.
 - `quench-labels` marks every decision point of a recorded session as
   sufficient (all declared required evidence already appeared in tool
   results) or not. It uses no model.
-- Recorded Context sessions give the headroom: 126 sessions from the Context
+- Recorded Context sessions give the headroom: 117 sessions from the Context
   experiments, with declared required evidence. In every arm, roughly half of
   each session's decision points come after sufficiency (median share: plain
   0.57, Graphify 0.40, Context 0.47). This is an upper bound: writing the answer
