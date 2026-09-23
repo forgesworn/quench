@@ -11,14 +11,16 @@
     "quench-labels": "src/cli-labels.ts",
     "quench-data": "src/cli-data.ts",
     "quench-score": "src/cli-score.ts",
-    "quench-cold": "bin/quench-cold.mjs"
+    "quench-cold": "bin/quench-cold.mjs",
+    "quench-estimate": "src/cli-estimate.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test \"test/**/*.test.ts\"",
     "check": "npm run typecheck && npm test",
     "data": "node src/cli-data.ts",
-    "score": "node src/cli-score.ts"
+    "score": "node src/cli-score.ts",
+    "estimate": "node src/cli-estimate.ts"
   },
   "devDependencies": {
     "@types/node": "24.13.6",
