@@ -320,3 +320,87 @@ changes no conclusion. The added sessions are all in the context arm.
 - The Q3 model decider was not re-scored: the 18 new sessions would need a
   further hosted pass, which was not approved. Laya was not re-run either; its
   result on the first freeze already rules it out.
+
+## Q1 amendment 2: savings weighted by executor input, 23 September 2026
+
+Every turn resends the conversation, so late turns cost more than early ones.
+Commits `60ec93b` and `024c13d` record each assistant message's input
+tokens against the decision point it followed. That is fresh input plus the
+cached prefix it wrote or read, because Sonnet runs record most of each turn
+as cache reads. The harness now reports saved executor input per session, as
+a total over each group, and its median. A stop saves the messages sent from
+the stop point up to the last read; the finishing messages still count
+against it. This measures work resent, not money: cached tokens are priced
+lower. Every one of the 135 labelled sessions records usage.
+
+This was added after the Q2 and Q3 results were known. It does not change
+any verdict. It is the measure the held-out criterion uses (see
+`docs/HELDOUT.md`), locked before any held-out session exists.
+
+Full freeze (`007d120c`), saved executor input as a total over the arm, then
+the median session:
+
+| Decider | plain (28.1M) | graphify (21.7M) | context (49.1M) | premature |
+| --- | --- | --- | --- | --- |
+| always continue | 0% / 0% | 0% / 0% | 0% / 0% | 0 / 0 / 0 |
+| oracle (bound) | 60.2% / 41.3% | 50.2% / 22.9% | 57.0% / 27.2% | 0 / 0 / 0 |
+| `coverage-or-stale-5` | 21.5% / 0% | 20.9% / 0% | 30.3% / 0% | 1 / 1 / 3 |
+| Q3 model (first freeze) | 1.9% / 0% | 3.2% / 0% | 0.0% / 0% | 2 / 2 / 1 |
+
+**The rule's saving comes from one task.** diagnosis-context sessions run
+long (17 to 74 decision points, against a median of 13 for all other
+sessions) and hold 57% of all executor input. On that task the rule saves 36%
+(plain), 38% (graphify) and 48% (context) of input; on every other task it
+saves 0 to 13%. Leaving diagnosis-context out, the rule saves 3.9%, 0.3% and
+3.5% of input by arm, where the oracle would save 31.8%, 20.0% and 23.6%. The
+rule is a guard against runaway sessions, not a general stop rule.
+
+Why ordinary sessions are hard: sufficiency marks the point where every
+required line has appeared in some tool result, often inside a large file
+read. The agent cannot tell that those are the lines the rubric wants, so it
+keeps reading to understand what it has. Much of the oracle's headroom in
+short sessions is out of reach for any decider that sees only run time.
+
+## Q2 batch 3 and the held-out primary, 23 September 2026
+
+Status of Q2 against its locked thresholds: still **not met** (median saved
+share 0% for every safe variant).
+
+Batch 3 (`730b453`, locked before scoring) tests the runaway hypothesis:
+keep `coverage-or-stale-5` and stop after a shorter stale run once a session
+is long. The same commit fixed the selection rule for the held-out primary:
+among variants with premature stops at or under 5% and no lost-evidence stop
+in every arm, take the highest minimum across arms of total saved executor
+input; ties go to fewer parts.
+
+All variants on the full freeze. Each cell gives premature (lost evidence),
+then total saved executor input:
+
+| Variant | plain (37) | graphify (37) | context (61) |
+| --- | --- | --- | --- |
+| `stale-3` | 4 (1) 37.1% | 2 (0) 32.2% | 7 (2) 41.6% |
+| `stale-5` | 1 (0) 21.5% | 1 (0) 20.9% | 3 (0) 30.3% |
+| `terms-stale-2` | 4 (1) 48.4% | 2 (1) 41.8% | 10 (2) 46.3% |
+| `coverage-clean` | 0 0% | 0 0% | 0 0% |
+| `repeat` | 0 15.3% | 0 0% | 0 6.9% |
+| `read-stale-2` | 7 (4) 50.8% | 3 (1) 43.1% | 9 (2) 46.0% |
+| `read-stale-3` | 5 (2) 39.7% | 2 (0) 35.2% | 6 (2) 42.5% |
+| `coverage-or-stale-5` | 1 (0) 21.5% | 1 (0) 20.9% | 3 (0) 30.3% |
+| `long15-stale-3` | 3 (0) 28.7% | 2 (0) 23.8% | 3 (0) 40.0% |
+| `long15-stale-2` | 3 (0) 37.5% | 2 (0) 26.5% | 3 (0) 42.0% |
+| `long20-stale-2` | 2 (0) 30.6% | 1 (0) 23.2% | 3 (0) 40.2% |
+| `cap-30` | 1 (0) 24.8% | 1 (0) 20.9% | 3 (0) 32.1% |
+
+The long-session variants save more but exceed 5% premature in at least one
+arm (`long20-stale-2`: 2 of 37 plain, 5.4%). `stale-5`,
+`coverage-or-stale-5` and `cap-30` tie at 20.9% for their weakest arm;
+`stale-5` has the fewest parts, so it is the **held-out primary**. On
+recorded data it makes the same stops as `coverage-or-stale-5` except in six
+context sessions. There clean coverage fired at or after the last read, so
+those stops saved nothing and lost nothing.
+
+Latency for this entry was measured with the machine under heavy unrelated
+load (load average 40 to 70): `stale-5` p50 12 to 13 µs, p99 254 to 468 µs,
+cold start median 28 to 34 ms over 20 runs. The quiet-machine figures from Q2
+(p99 171 µs, cold start about 21 ms) stand until a re-measurement at low load
+is recorded.
