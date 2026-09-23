@@ -22,6 +22,13 @@ test('deciders import only the run-time interface: no labels, data, harness, ora
   }
 })
 
+test('the live hook path imports no labels, data, harness or oracle', () => {
+  const allowed = /^(node:[\w/_]+|\.\/(decider|session|live|hook|deciders\/index)\.ts)$/
+  for (const name of ['live.ts', 'hook.ts', 'hook-client.ts', 'live-daemon.ts']) {
+    for (const spec of importsOf(join(root, name))) assert.match(spec, allowed, `src/${name} imports ${spec}`)
+  }
+})
+
 test('decisions do not change when required evidence, labels or acceptance change', () => {
   const text = stream([
     call('a', 'Read', { file_path: '/w/workspace/src/a.ts' }), result('a', 'export function alpha() {}'),

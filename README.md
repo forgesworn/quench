@@ -9,7 +9,9 @@ resends the conversation, so a correct early stop is the cheapest saving
 available.
 
 Private and experimental. Nothing here is a released product or a measured
-saving yet.
+saving yet. On the recorded development set, the best safe rule saves executor
+input only on sessions that run long; the held-out test
+([protocol](docs/HELDOUT.md)) has not run.
 
 ## Why
 
@@ -43,6 +45,23 @@ npm run check
 node src/cli-data.ts                          # Q0: rebuild results/manifest.json and labels.json
 node src/cli-score.ts --decider oracle        # Q1: score a decider (oracle, always-continue, ...)
 node src/cli-score.ts --decider always-continue --cold 30
+node src/cli-live-check.ts                    # the live path decides exactly as replay
+node src/cli-hook-sim.ts --limit 12           # drive the real hook over recorded sessions
+```
+
+### Hook (for the Q6 online check)
+
+`bin/quench-hook.mjs` is a Claude Code `PostToolUse` hook running the frozen
+held-out decider. The first call in a session decides in process and starts a
+small background process that keeps the decider in memory, reads only the new
+bytes of the transcript on each later call, and exits after 30 idle minutes.
+When the decider says stop, the hook adds one hint to the agent's context,
+once per session. `QUENCH_HINT=off` logs the hint it would have given and
+prints nothing (the control arm). Decisions and hints are logged to
+`$QUENCH_STATE_DIR` (default: the system temporary directory).
+
+```json
+{ "hooks": { "PostToolUse": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node <quench>/bin/quench-hook.mjs" }] }] } }
 ```
 
 `quench.local.json` (untracked) points at the private evidence:
