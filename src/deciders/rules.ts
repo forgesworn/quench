@@ -13,6 +13,8 @@ import { classifyCall } from '../session.ts'
 export interface RuleParams {
   /** Stop only after this many consecutive decision points added no new file. */
   staleFor?: number
+  /** What counts as a new file: any path read or listed (default), or only paths the agent chose to read. */
+  staleOn?: 'seen' | 'read'
   /** Require at least one test file and one implementation file read. */
   requireTestAndImpl?: boolean
   /** Require every identifier named in the prompt to have appeared in a tool result. */
@@ -67,6 +69,7 @@ export const isImplPath = (path: string): boolean => codePath.test(path) && !tes
 
 export function ruleDecider(params: RuleParams): Decider {
   const files = new Set<string>()
+  const readFiles = new Set<string>()
   let testRead = false
   let implRead = false
   let terms: string[] = []
@@ -80,10 +83,10 @@ export function ruleDecider(params: RuleParams): Decider {
   let newFileThisPoint = false
 
   const see = (path: string, read: boolean): void => {
-    if (!files.has(path)) {
-      files.add(path)
-      newFileThisPoint = true
-    }
+    const known = params.staleOn === 'read' ? readFiles : files
+    if (!known.has(path) && (read || params.staleOn !== 'read')) newFileThisPoint = true
+    files.add(path)
+    if (read) readFiles.add(path)
     if (read && isTestPath(path)) testRead = true
     if (read && isImplPath(path)) implRead = true
   }

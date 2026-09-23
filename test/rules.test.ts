@@ -40,3 +40,13 @@ test('coverage and repeat rules fire on their signals only', () => {
   assert.deepEqual(decisions({ stopOnCleanCoverage: true }, [read('a', 'src/a.ts'), coverage]), ['continue', 'stop'])
   assert.deepEqual(decisions({ stopOnRepeat: true }, [read('a', 'src/a.ts'), read('b', 'src/b.ts'), read('c', 'src/a.ts')]), ['continue', 'continue', 'stop'])
 })
+
+test('read novelty ignores listed paths but counts a listed path once it is read', () => {
+  const listing: SessionEvent[] = [
+    { kind: 'tool_use', id: 'l', name: 'Bash', input: { command: 'grep -rn x src' } },
+    { kind: 'tool_result', id: 'l', text: 'src/c.ts:1: x\nsrc/d.ts:2: x', isError: false },
+  ]
+  const batches = [read('a', 'src/a.ts'), read('b', 'src/a.test.ts'), listing, read('c', 'src/c.ts'), read('d', 'src/a.ts')]
+  assert.deepEqual(decisions({ requireTestAndImpl: true, staleOn: 'read', staleFor: 1 }, batches), ['continue', 'continue', 'stop', 'continue', 'stop'])
+  assert.deepEqual(decisions({ requireTestAndImpl: true, staleFor: 1 }, batches), ['continue', 'continue', 'continue', 'stop', 'stop'])
+})

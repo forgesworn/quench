@@ -29,6 +29,15 @@ export const variants: Record<string, RuleParams> = {
   'repeat': { requireTestAndImpl: true, stopOnRepeat: true },
 }
 
+/** Batch 2, locked 23 September 2026 after batch 1 was scored, before batch 2 was. */
+Object.assign(variants, {
+  // Novelty from the files the agent chooses to read, ignoring paths merely listed in results.
+  'read-stale-2': { requireTestAndImpl: true, staleOn: 'read', staleFor: 2 },
+  'read-stale-3': { requireTestAndImpl: true, staleOn: 'read', staleFor: 3 },
+  // The two most precise batch 1 signals together.
+  'coverage-or-stale-5': { requireTestAndImpl: true, stopOnCleanCoverage: true, staleFor: 5 },
+} satisfies Record<string, RuleParams>)
+
 export const variantFactories: Record<string, DeciderFactory> = Object.fromEntries(
   Object.entries(variants).map(([name, params]) => [name, () => ruleDecider(params)]),
 )
