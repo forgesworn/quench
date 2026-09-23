@@ -2,3 +2,4 @@ node_modules/
 *.tgz
 coverage/
 results/
+quench.local.json

@@ -34,7 +34,7 @@ steps are necessary (writing the answer, running tests).
 5. **Online check**: an executor run with the decider switched on, on held-out
    tasks, only if the offline benchmark shows savings without premature stops.
 
-See [the benchmark design](docs/BENCHMARK.md).
+See [the goals](GOALS.md) and [the benchmark design](docs/BENCHMARK.md).
 
 ## Use
 

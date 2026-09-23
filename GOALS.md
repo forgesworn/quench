@@ -1,0 +1,168 @@
+# Quench goals
+
+Updated 23 September 2026. Quench decides, at each decision point of a coding
+agent's session, whether to **stop** gathering evidence or **continue**. A good
+decision saves turns, and turns drive agent cost, because every turn resends
+the conversation. A premature stop costs quality, so it is the failure we
+guard against first.
+
+This is a private, experimental project. No goal below is met until its
+evidence is recorded in `docs/EVIDENCE.md` against a named commit. Claim only
+what the benchmark measured.
+
+## Starting point
+
+- `quench-labels` marks every decision point of a recorded session as
+  sufficient (all declared required evidence already appeared in tool
+  results) or not. It uses no model.
+- Recorded Context sessions give the headroom: 126 sessions from the Context
+  experiments, with declared required evidence. In every arm, roughly half of
+  each session's decision points come after sufficiency (median share: plain
+  0.57, Graphify 0.40, Context 0.47). This is an upper bound: writing the answer
+  and running tests still have to happen after a correct stop.
+- The recorded tasks were used to tune Context. Offline results on them need
+  confirming on held-out tasks (Q5) before any claim.
+
+## Rules for every goal
+
+- Deterministic code first. Add a model only where a rule measurably falls
+  short on the same benchmark.
+- A decider sees only what exists at run time: the task prompt, the transcript
+  so far and tool outputs. It must never read the declared required evidence,
+  the reviewer rubric or the outcome. Test for this leakage explicitly.
+- Fix each decision rule and threshold in a committed file **before** scoring
+  it, and record every scored variant, including the ones that failed.
+- Report per arm and per task, with runs side by side, never pooled across
+  arms. Report premature stops next to savings, never savings alone.
+- Jev and Laya are benchmark comparators only. They are never adopted,
+  embedded or depended on.
+- No hosted model or executor spend without the owner's approval of a stated
+  estimate. Log failed attempts; never retry a provider refusal or work round
+  a spending hold.
+- Recorded sessions stay outside the repository. Point at them with an
+  untracked `quench.local.json` (see Q0). Commit code, tests, fixtures you
+  wrote and non-sensitive summaries only.
+
+## Model and effort assignments
+
+| Work | Assignment |
+| --- | --- |
+| Data, labels, replay, scoring, rules | Deterministic code; DeepSeek Flash with thinking off for routine implementation against a written contract |
+| Typed model decider (Q3) | DeepSeek Flash, thinking off, structured output; DeepSeek Pro only if Flash is measured inadequate |
+| Protocol locks, leakage review and acceptance of results | A frontier reviewer at high effort, in a separate session from the one that built the decider |
+
+## Goals
+
+### Q0: A frozen, reproducible data set
+
+Build a manifest of the recorded sessions Quench uses: run label, task, arm,
+executor model, accepted, and a SHA-256 of each stream and receipt.
+`quench.local.json` (untracked, added to `.gitignore`) maps run labels to local
+evidence directories and the task acceptance directory. Include the Context
+0.4.0 screen (`20260923-screen-pro-040`) once it completes.
+
+**Done when:** one command rebuilds the manifest and the labels with
+byte-identical output on a second run; `docs/EVIDENCE.md` records the counts
+per run, arm and task, and the manifest digest. Sessions without declared
+evidence (code-change tasks) are listed as unlabelled, not dropped silently.
+
+### Q1: A scoring harness with bounds
+
+Replay each labelled session point by point through a decider interface,
+`decide(snapshot) -> { decision: 'stop' | 'continue', reason }`. The first
+`stop` ends the session. Score:
+
+- **premature-stop rate**: sessions stopped at a point that was not
+  sufficient;
+- **saved**: decision points, tool calls and result bytes after the stop,
+  minus the finishing steps a stop still requires (the answer write and any
+  test run the recorded session made after its last evidence read);
+- **late**: points between the first sufficient point and the stop.
+
+Implement two reference deciders: *always continue* (the recorded behaviour)
+and *oracle* (stop at the first sufficient point; it reads labels and exists
+only as a bound).
+
+**Done when:** tests cover replay, finishing-step accounting and both bounds;
+the harness reports oracle savings and a 0% premature-stop rate, and always
+continue reports 0 saved, per arm and task.
+
+### Q2: A deterministic decider
+
+Write rules over run-time signals only, for example:
+
+- every identifier named in the task prompt has had its declaration and at
+  least one test file returned;
+- the last *k* tool results added no new file;
+- a coverage check (where the arm has one) reports nothing missing.
+
+Lock the acceptance thresholds before scoring:
+
+- premature-stop rate at most 5% of sessions in every arm;
+- median saved decision points at least 20% of the recorded session.
+
+**Done when:** a leakage test proves the decider cannot see labels, required
+evidence or outcomes; every rule variant scored is listed in
+`docs/EVIDENCE.md` with its metrics; the best variant either meets the
+thresholds or the failure is recorded with the cause.
+
+### Q3: A typed model decider (only if Q2 falls short)
+
+Give a small model the task prompt and a bounded summary of the transcript
+so far (tool names, files touched, excerpts capped by size). It returns
+`{ decision, missing: string[] }` against a schema. Count the decider's own
+tokens as cost, and score it on the same harness and thresholds as Q2.
+
+**Done when:** it beats the best Q2 rule on saved points at no worse a
+premature-stop rate, net of its own tokens, or the attempt is recorded as not
+useful. Estimate the cost for the owner before running it on all sessions.
+
+### Q4: Jev and Laya as comparators
+
+Establish how each can be run (local or hosted) and at what cost; put the
+estimate to the owner before any paid run. Build thin adapters behind the Q1
+interface, isolated in `comparators/` with no import from Quench's decider
+code, and run them on identical snapshots.
+
+**Done when:** each comparator is scored on the same sessions and metrics as
+Quench, or the reason it could not be (unavailable, licence, cost declined) is
+recorded. Nothing from either is embedded in Quench.
+
+### Q5: Held-out tasks
+
+Write at least six new tasks on at least two repositories outside the
+ForgeSworn ecosystem: orientation, diagnosis, impact and code change, each
+with declared required evidence and a deterministic checker where possible.
+A session that does not build or tune the decider writes and hashes them.
+Recording sessions for them needs executor runs; estimate the cost and get
+approval first (DeepSeek V4 Pro through the local route is the default
+executor).
+
+**Done when:** the tasks are locked and hashed, sessions are recorded, and
+the Q2 or Q3 decider is scored on them without any change after it has seen
+them.
+
+### Q6: The online check
+
+Put the decider into a live session: a stop hint delivered through a Claude
+Code hook or a small MCP tool. Run a locked protocol on the held-out tasks
+with the hint on and off, the same executor and repeated runs, and measure
+executor input, turns and acceptance.
+
+**Done when:** a prospectively locked rule is met, for example at least 20%
+lower median input with no fewer accepted tasks, or the result is recorded as
+not met, with the per-task spread.
+
+### Q7: Packaging (only after Q6 passes)
+
+Publish the decider as a small package with its hook or MCP entry point,
+documentation of what it saw, measured and did not measure, and a changelog.
+Release through the authorised process only.
+
+## Order and handoff
+
+Q0, Q1, Q2 in order, then Q3 only if needed. Q4 can start once Q1 exists. Q5
+can be prepared alongside Q2 by a separate session. Q6 waits for Q5 and a
+passing offline decider. Each handoff names the goal, starting commit, allowed
+files, model and effort, and acceptance checks. The receiver returns the diff,
+checks and evidence entry.
