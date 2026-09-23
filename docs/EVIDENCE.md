@@ -429,3 +429,50 @@ Status: groundwork only; Q6 itself waits for Q5. Commit `5feaca1`.
   `QUENCH_HINT=off` it prints nothing and logs the withheld hint; the leakage
   test covers the live path.
 - Protocol for the online check: `docs/ONLINE.md` (locked with its estimate).
+
+## Q5: held-out tasks locked, 23 September 2026
+
+Status: **in progress**. The tasks are written, locked and proved; no session
+has been recorded. Recording waits for the owner's approval of the estimate
+in `docs/HANDOFF-Q5.md` and for changes to the recording harness.
+
+- Written by a separate agent session with no context from this one. It was
+  given only `docs/HANDOFF-Q5.md`, the Q5 goal and the D5 task formats, and
+  was barred from Quench's decider code, results and protocols. It ran no
+  executor session and no model inference.
+- Eight tasks, an orientation, diagnosis (seeded fault), impact and code
+  change on each of two MIT repositories outside ForgeSworn:
+  - `tj/commander.js` at `ba6d13ddb4243e5913367734f8c159089ffe7834`
+    (`git archive` sha256 `e5a487dc…8c84`);
+  - `markdown-it/markdown-it` at `3c51991c32aaa2b002a52c009334ebe5752c84b3`
+    (`git archive` sha256 `c3119a85…3a5c`).
+- Experiment `quench-heldout-20260923-v1`, locked 2026-09-23T10:44:58Z, in
+  private storage. `protocol.json` sha256
+  `d5dcc7dd0ff28f79ac26d457a4b9eb7aede91bfc051729d63315eea99bc8c0d5`;
+  `SHA256SUMS` (81 files) sha256
+  `6d81a4d47bbc0d529d041d126678e7adc73de9ec28bb0b1ff0b01b827d958578`.
+- Every task has declared required evidence, the code changes included: 86
+  tokens in all, 6 to 16 per task. Every task has a deterministic checker. 28
+  proofs came out as expected: each reference answer or patch is accepted,
+  and each trivial or plausible wrong one is rejected.
+- Checked independently here: the lock verifier passes; both clones are
+  clean and at their pinned revisions; all 86 tokens occur verbatim at their
+  paths in the pinned source, with the seeded patch applied for the two
+  diagnosis tasks.
+- Graphify builds its graph locally for both repositories without a model,
+  so the Graphify arm is feasible. The Context server's index build on these
+  trees is untested.
+- Recording needs harness changes, listed in the protocol's `harnessGaps`:
+  - read the task pack from `taskPack.directory` rather than the D5 path;
+  - accept structured answers by checker without a reviewer verdict;
+  - add the two repository roots to `local.json`;
+  - pass the Quench hook in off mode.
+
+**Known risk, recorded before any session exists.** These tasks declare 6 to
+16 required tokens each; the development tasks declared 3 to 5. Sufficiency
+needs every declared token to have appeared, so fewer held-out sessions may
+reach it. The locked safety rule counts any stop before sufficiency as
+premature, including in sessions that never gather the rest. The lost-evidence
+count separates a stop that cost evidence from one in a session that would
+never have found it, and it will be reported next to the verdict. Neither
+the protocol nor the tasks change because of this.
