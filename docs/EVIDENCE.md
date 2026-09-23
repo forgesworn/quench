@@ -159,8 +159,9 @@ Cause: the threshold is close to the bound. Net of finishing steps, the
 oracle's median saved share is 20.0% for graphify and 23.8% for context, so a
 rule meets 20% only by stopping within about a point of sufficiency in more
 than half of all sessions. Novelty signals (no new file, a repeated read, a
-clean coverage report) fire late: median lateness 4 to 6.5 points where they
-fire, and not at all in most sessions. Loosening them to fire sooner raises
+clean coverage report) fire late or not at all: median lateness (the stop,
+or the session's end, minus the first sufficient point) is 4 to 6.5 points,
+and the safe variants fire in under half of the sessions. Loosening them to fire sooner raises
 premature stops above 5% before the median saving leaves zero
 (`read-stale-2`: plain 18.9% premature for a 10% median). Sufficiency here
 means the agent has seen particular lines of implementation and tests;
