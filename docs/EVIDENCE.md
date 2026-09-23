@@ -502,3 +502,35 @@ process and starts the background process). Wall time per call: median
 
 Every budget in GOALS is met with room to spare: p50 under 0.1 ms, p99 under
 1 ms, and cold start under 30 ms.
+
+## Q5 recording: declarations before the first counted session, 23 September 2026
+
+The owner approved DeepSeek spend for recording and asked for Flash before
+Pro.
+
+- **The Flash pass is a pilot.** One repetition of the eight held-out tasks
+  in the plain, Graphify and Context arms (24 sessions) on
+  `deepseek-v4.1-flash:cloud`. It shakes out the harness and gives a
+  secondary result. It does not count towards the Q5 verdict, which
+  `docs/HELDOUT.md` fixes on DeepSeek V4 Pro.
+- **The Pro pass is the verdict:** three repetitions, all three arms (72
+  sessions). Graphify is included because its setup proved feasible.
+- **The harness is a private copy** of Context's `graphify-20260922/run.mjs`
+  (source commit `8d7954f`, sha256 `89e90216…`), kept with the held-out
+  protocol. Its changes:
+  - read the task pack from the protocol directory;
+  - accept structured answers by checker alone, as the protocol states;
+  - add an `--executor-model` override, recorded in each receipt;
+  - install the Quench hook in off mode for the executor only.
+- **Session persistence is on** when the hook is installed, because the hook
+  reads the session transcript and `--no-session-persistence` means none is
+  written. That changes what Claude Code saves to disk, not what the model
+  sees, and each receipt records it.
+- **Versions:** Claude Code 2.1.280, Graphify 0.9.65 (instruction hash as
+  locked), Ollama on the local route. Context is at release 0.4.1 (Context
+  commit `485a444`); the development screen used 0.4.0.
+- **Two smoke sessions, not counted.** Both ran orientation-commander in the
+  plain arm on Flash, and the checker accepted both. The first exposed the
+  missing transcript; the second exposed the socket path limit (fixed at the
+  commit above). In the second, the live hook withheld its stop at point 20
+  of 31, and an offline replay of the recorded stream also stops at point 20.
