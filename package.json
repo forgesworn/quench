@@ -16,7 +16,8 @@
     "quench-model": "src/cli-model.ts",
     "quench-hook": "bin/quench-hook.mjs",
     "quench-live-check": "src/cli-live-check.ts",
-    "quench-hook-sim": "src/cli-hook-sim.ts"
+    "quench-hook-sim": "src/cli-hook-sim.ts",
+    "quench-chains": "src/cli-chains.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

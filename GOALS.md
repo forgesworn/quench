@@ -200,6 +200,29 @@ Publish the decider as a small package with its hook or MCP entry point,
 documentation of what it saw, measured and did not measure, and a changelog.
 Release through the authorised process only.
 
+### Q8: When to compact a long session
+
+Q6 showed that a stop hint captures almost nothing: agents already stop
+gathering near the right point, and they ignore the hint. The cost is
+elsewhere. On the owner's own Claude Code sessions (30 days, aggregate only),
+80% of main-session cost sits in sessions of more than 300 requests, 78% in
+requests sent with more than 200K tokens of context, and 68% is cache reads of
+context sent again. Simulated on those sessions, compacting earlier would cut
+cost by up to about 29% (at 400K) or 45% (at 200K) if the agent behaved the
+same. That is an upper bound. Whether the agent then needs work done again
+or loses quality is the question.
+
+Measure it on dependent multi-step chains written by a fresh session, with
+deterministic checkers per step. Compare three policies in one agent session
+per chain: carry everything, compact at a fixed window, and compact at every
+step boundary. Price cost with published cache and output multipliers, not
+raw tokens.
+
+**Done when:** the protocol in [docs/CHAINS.md](docs/CHAINS.md) is locked
+before any counted run, the runs are recorded, and the result is written up
+with per-chain and per-step spread. It must say whether a boundary-aware
+trigger (a Quench decider) is worth building over the plain window setting.
+
 ## Order and handoff
 
 Q0, Q1, Q2 in order, then Q3 only if needed. Q4 can start once Q1 exists. Q5
