@@ -699,3 +699,77 @@ safety rule allows none, so Q5 is not met. The Context arm met every rule.
 Per GOALS, Q6 waits for a passing offline decider, so the online check does
 not run on this result. Any new rule is a new decider: it needs fresh
 held-out tasks, because it would be designed knowing these results.
+
+## Q6 verdict: the live hint on the Context arm, 23 September 2026
+
+Status: **not met.** Under Amendment 1 of `docs/ONLINE.md` the hint fails
+both rules. The larger finding is about the measure: most of what replay
+counted as saved was work the agent still had to do.
+
+- **Recording:** 48 of 48 sessions (8 held-out tasks, Context arm,
+  DeepSeek V4 Pro, three repetitions, hint on and off back to back), hook at
+  commit `3577233`, hook file `02fd1d6c…`. No session failed to run and none
+  was rerun. Data sets: on manifest `0e278544…`, labels `cef5a0a7…`; off
+  manifest `8b5a1231…`, labels `004c2215…`.
+
+| Rule | Hint on | Hint off | Result |
+| --- | ---: | ---: | --- |
+| Cost: total executor input (Q1 harness measure) | 15.53M | 15.68M | **fail**: 1.0% lower, 20% needed |
+| Quality: accepted sessions | 21 | 24 | **fail** |
+
+- **Also reported:** the receipts' own usage totals give 16.27M against
+  16.59M (1.9% lower). Turns 790 against 814; executor time 3,907 s against
+  4,200 s.
+- **Per task (median input, on against off):** diagnosis-markdown-it
+  0.32M against 0.59M; orientation-markdown-it 0.25M against 0.35M;
+  orientation-commander 1.23M against 0.74M; the rest within 0.11M. The hint
+  fired in only 11 hint-on sessions, so most of these gaps come from
+  sessions that never received it and show run-to-run spread, not the hint.
+- **The three rejected answers did not receive the hint.** They are
+  orientation-commander in repetitions 1 and 2 (a wrong field, for example
+  `outputHelp` for `_outputHelpIfRequested`) and orientation-markdown-it in
+  repetition 3 (11 of 12 declared lines gathered). In none of the three did
+  the decider stop, so the hook sent nothing and the session was treated
+  exactly as in the off condition. The quality rule fails as locked; the
+  cause is spread between runs, not the hint.
+- **Delivery and compliance:** in all 11 sessions where the hint fired it
+  reached the transcript as a `hook_additional_context` attachment at the
+  decided point (lag 0). No later assistant text refers to it. After the
+  hint, agents made 76 read calls and used 6.93M input; after the withheld
+  hint in the off condition, 78 read calls and 6.98M. The agent ignored the
+  hint.
+
+### What a stop could have saved
+
+`savedAfter` counts every message from the stop to the agent's last read.
+In a code change the agent reads again while editing and testing, so that
+span is mostly the task's own work. A stop hint asks the agent to stop
+gathering and answer; what it can remove is the pure gathering between
+the stop and the agent's next edit or check. Measured that way (stale-5
+replayed, and the label oracle's first sufficient point as a ceiling):
+
+| Data set, arm | Locked measure | Reads only | Pure gathering after stale-5 | Ceiling (first sufficient) |
+| --- | ---: | ---: | ---: | ---: |
+| Development, Context | 30.3% | 24.5% | 13.9% | 11.1% |
+| Development, plain | 21.5% | 18.6% | 4.3% | 13.6% |
+| Held-out Pro, Context | 42.8% | 26.1% | 0.3% | 13.8% |
+| Held-out Pro, plain | 46.7% | 26.7% | 13.6% | 19.4% |
+| Online, hint off | 36.9% | 19.3% | 2.6% | 19.2% |
+
+In 8 of the 11 off sessions where stale-5 stopped, and in all 8 of the
+held-out Pro Context sessions, the agent had already edited or run a check
+before the stop point. `stale-5` stops when no new file has appeared for
+five points, and on these tasks that is usually after the agent has moved
+on to the answer. The rule recognises that gathering has ended, at about
+the point where the agent already ends it.
+
+What this shows. The replay savings reported for Q1, Q2 and Q5 are real
+counts of input after the stop, but a stop hint cannot capture most of
+them. On held-out tasks, what was left to capture after `stale-5` was
+0.3–2.6% of input on the Context arm. The live test agrees: 1.0%. An
+agent that stopped at the first sufficient point would leave 11–19% of
+input to cut, but no decider here finds that point safely. The hint was
+also ignored. Q7 (packaging) waits for Q6 to pass, so nothing is packaged.
+A new attempt would need a decider aimed at the first sufficient point, a
+mechanism the agent cannot ignore, the pure-gathering measure locked as
+primary, and fresh held-out tasks.
