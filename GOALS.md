@@ -43,6 +43,39 @@ what the benchmark measured.
   untracked `quench.local.json` (see Q0). Commit code, tests, fixtures you
   wrote and non-sensitive summaries only.
 
+## Speed and language
+
+Decisions must be ultra fast. Each agent turn is a model call of seconds, so
+the decider must never be noticeable next to it:
+
+- **In process:** p99 under 1 ms per decision, p50 under 0.1 ms, measured by
+  the Q1 harness on the recorded sessions.
+- **Cold start:** under 30 ms from process start to first decision, for a
+  per-turn hook.
+- **Incremental:** the decider keeps state and processes only new events, so
+  a decision costs the same at turn 5 and turn 80. It never re-parses the
+  whole transcript.
+- **No model on the hot path:** a deterministic rule decides every turn. A
+  model (Q3) may only run off the critical path at rare, ambiguous points and
+  never blocks a turn.
+
+Quench is strict TypeScript on Node 24, like most of the ForgeSworn ecosystem,
+running `.ts` directly with Node's type stripping (`erasableSyntaxOnly`).
+Move the decision core to Rust only if measurement misses these budgets; the
+replay harness and labels stay in TypeScript either way.
+
+## Relationship to Context
+
+Quench and Context stay independent: neither imports the other. Quench reads
+agent transcripts, whatever tools produced them (plain shell, Graphify,
+Context), so it can help any agent and be compared across tool arms. Context
+remains a deterministic, no-network navigation server; a decider does not
+belong inside it. When Context is present, Quench may use its signals as they
+appear in tool results (explore, packet and coverage output), parsed from the
+transcript rather than through a code dependency. Context's experiments may
+use Quench labels as a development tool; its packages do not depend on
+Quench.
+
 ## Model and effort assignments
 
 | Work | Assignment |
@@ -68,9 +101,10 @@ evidence (code-change tasks) are listed as unlabelled, not dropped silently.
 
 ### Q1: A scoring harness with bounds
 
-Replay each labelled session point by point through a decider interface,
-`decide(snapshot) -> { decision: 'stop' | 'continue', reason }`. The first
-`stop` ends the session. Score:
+Replay each labelled session point by point through an incremental decider
+interface: `observe(event)` for each new stream event, then
+`decide() -> { decision: 'stop' | 'continue', reason }` at each decision point.
+The first `stop` ends the session. Score:
 
 - **premature-stop rate**: sessions stopped at a point that was not
   sufficient;
@@ -83,9 +117,12 @@ Implement two reference deciders: *always continue* (the recorded behaviour)
 and *oracle* (stop at the first sufficient point; it reads labels and exists
 only as a bound).
 
+The harness also times every `decide()` call and reports p50 and p99, and a
+separate cold-start measurement.
+
 **Done when:** tests cover replay, finishing-step accounting and both bounds;
 the harness reports oracle savings and a 0% premature-stop rate, and always
-continue reports 0 saved, per arm and task.
+continue reports 0 saved, per arm and task; decision latency is reported.
 
 ### Q2: A deterministic decider
 
@@ -99,7 +136,8 @@ Write rules over run-time signals only, for example:
 Lock the acceptance thresholds before scoring:
 
 - premature-stop rate at most 5% of sessions in every arm;
-- median saved decision points at least 20% of the recorded session.
+- median saved decision points at least 20% of the recorded session;
+- decision latency within the budgets in "Speed and language".
 
 **Done when:** a leakage test proves the decider cannot see labels, required
 evidence or outcomes; every rule variant scored is listed in

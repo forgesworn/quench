@@ -1,10 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { labelSession } from '../src/labels.mjs'
+import { labelSession } from '../src/labels.ts'
 
-const call = (id) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Read', input: {} }] } })
-const result = (id, text, isError = false) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text }], is_error: isError }] } })
-const stream = (events) => events.map((event) => JSON.stringify(event)).join('\n')
+const call = (id: string) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Read', input: {} }] } })
+const result = (id: string, text: string, isError = false) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text }], is_error: isError }] } })
+const stream = (events: object[]) => events.map((event) => JSON.stringify(event)).join('\n')
 
 test('labels the first point where every required token has appeared and the headroom after it', () => {
   const text = stream([
@@ -19,7 +19,7 @@ test('labels the first point where every required token has appeared and the hea
   assert.deepEqual(labels.points.map((point) => point.sufficient), [false, true, true, true])
   assert.equal(labels.firstSufficient, 2)
   assert.deepEqual(labels.headroom, { decisionPoints: 2, toolCalls: 2, resultBytes: Buffer.byteLength('nothing new') + Buffer.byteLength('more reading') })
-  assert.equal(labels.points[2].errors, 1)
+  assert.equal(labels.points[2]?.errors, 1)
 })
 
 test('reports missing tokens and no headroom when evidence is never complete', () => {

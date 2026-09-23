@@ -39,8 +39,8 @@ See [the goals](GOALS.md) and [the benchmark design](docs/BENCHMARK.md).
 ## Use
 
 ```sh
-npm test
-node src/cli-labels.mjs --acceptance <dir of task acceptance JSON> <label>=<evidence dir> [...]
+npm run check
+node src/cli-labels.ts --acceptance <dir of task acceptance JSON> <label>=<evidence dir> [...]
 ```
 
 Evidence directories hold one cell per session: `receipt.json` (task, arm,

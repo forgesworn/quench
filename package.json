@@ -8,10 +8,15 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "quench-labels": "src/cli-labels.mjs"
+    "quench-labels": "src/cli-labels.ts"
   },
   "scripts": {
-    "test": "node --test \"test/**/*.test.mjs\"",
-    "check": "npm test"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "typescript": "5.9.3"
   }
 }
