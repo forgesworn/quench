@@ -174,3 +174,74 @@ with knowledge of the batch 1 scores (batch 2 only). With 6 to 8 sessions per
 task and arm, per-task figures are not measured differences. The literal
 premature definition counts a stop in a session that never became sufficient
 as premature even where the recorded agent itself gave up.
+
+## Q3: typed model decider, 23 September 2026
+
+Status: **planned, awaiting the owner's approval of the estimate**. Q2 fell
+short, so Q3 applies. Nothing has been run and no model has been called.
+
+Commit `7806824` adds the bounded, run-time-only summary
+(`src/deciders/summary.ts`: task prompt, files read with tests marked, the
+three newest result excerpts, newest calls first to fit) and
+`node src/cli-estimate.ts`, which counts the input without calling a model.
+The planned decider asks only at points where a test file and an
+implementation file have been read (1,224 of 2,073 points), returns
+`{ decision, missing: string[] }` and stops at the first `stop`.
+
+Estimate for one full scoring pass, upper bound (every gated point asked):
+
+- 12,000-character summary: about 1.59M summary tokens, mean 1,300 and
+  largest 3,000 per call. With about 250 tokens of instructions and schema
+  per call, about 1.9M input tokens; output about 60 tokens per call, about
+  75K tokens in total.
+- 3,500-character summary: about 1.05M summary tokens, about 1.35M input in
+  total.
+- Executor: DeepSeek Flash with thinking off through the local Ollama route,
+  which draws Ollama Cloud credit. The Context experiments never read that
+  credit rate, so no cash figure is claimed; the owner reads consumption from
+  the account. Each rule or threshold variant scored is a further pass of the
+  same size, less where earlier stops cut sessions short.
+
+## Q4: Jev and Laya as comparators, 23 September 2026
+
+Status: **in progress**. Laya scored; Jev awaits the owner's approval.
+
+How each runs (public pages, read 23 September 2026):
+
+- **Laya**: Convai Innovations, Apache-2.0, `pip install laya` (0.3.7),
+  weights on Hugging Face (`convaiinnovations/laya`, English checkpoint 421M
+  parameters, 512-token input). Runs locally: no spend.
+- **Jev**: TypeSafe AI's hosted "System One" API, early access through
+  console.typesafe.ai; published price $0.042 per million input tokens,
+  output free. Scoring it on the 2,070 distinct snapshots the Laya adapter
+  sends (3.47M characters, about 0.87M tokens, plus the fixed question) comes
+  to about 0.95M input tokens, roughly $0.04 per pass at the published price.
+  It needs an early-access account, so not run.
+
+The adapters live in `comparators/` and import no Quench decider code
+(`test/leakage.test.ts`). Each snapshot is the task prompt (700 characters)
+and the newest calls with 120-character result excerpts, within 1,900
+characters.
+
+**Laya result**, commits `22617f8` (question and thresholds locked) and
+`7c6d226` (checkpoint selected per call), model revision
+`1c5edc17a7acd8701df6fc341c0d179f1c62c982`, answers sha256 `189d4e77`.
+Fixed yes/no question: "Has the coding agent already gathered enough evidence
+from the repository to write its final answer, so that further tool calls are
+unnecessary?" Stop when p ≥ threshold. 2,070 snapshots took 814 s locally
+(0.39 s each on a loaded machine), too slow for the per-turn budget, so this
+is an offline comparison only.
+
+| Variant | plain (37) | graphify (37) | context (43) |
+| --- | --- | --- | --- |
+| `laya-50` | 37 / 36 (36) / 80.0% | 37 / 37 (37) / 72.7% | 43 / 43 (43) / 82.6% |
+| `laya-80` | 16 / 8 (7) / 0% | 14 / 7 (6) / 0% | 40 / 40 (40) / 76.9% |
+
+(stopped / premature (lost evidence) / median saved share.) Laya is not a
+useful stopper here. Its answers sit above 0.5 on 1,881 of 2,070 snapshots
+(mean 0.65), so it stops at or near the first point, and the high context-arm
+rate follows the arm's longer prompt rather than the evidence. Its savings
+come almost entirely from stopping prematurely. No Q2 rule, and not the
+oracle, is compared favourably or unfavourably on savings alone. Limitation:
+the 512-token input truncates most snapshots, and one question with a fixed
+threshold does not test Laya's other question types.
