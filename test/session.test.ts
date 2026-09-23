@@ -41,3 +41,8 @@ test('counts each message\'s input tokens once, after the point its results clos
   assert.equal(parsed.points.length, 2)
   assert.deepEqual(parsed.inputTokensAfter, [50, 90, 140])
 })
+
+test('input tokens include the cached prefix a message wrote or read', () => {
+  const cached = { type: 'assistant', message: { id: 'm1', content: [{ type: 'tool_use', id: 'a', name: 'Read', input: {} }], usage: { input_tokens: 2, cache_creation_input_tokens: 300, cache_read_input_tokens: 5000 } } }
+  assert.deepEqual(parseSession(stream([cached, result('a', 'x')])).inputTokensAfter, [5302, 0])
+})

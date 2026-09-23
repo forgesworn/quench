@@ -92,12 +92,28 @@ interface ParsedLine {
   message?: { id: string; inputTokens: number }
 }
 
+interface Usage {
+  input_tokens?: number
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
+}
+
+/**
+ * The conversation the model processed for one message: fresh input plus the
+ * cached prefix it wrote or read. Cached tokens are priced lower, so this
+ * measures work resent, not money.
+ */
+function conversationTokens(usage: Usage | undefined): number | undefined {
+  if (typeof usage?.input_tokens !== 'number') return undefined
+  return usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
+}
+
 function parseLine(line: string): ParsedLine {
   if (!line.trim()) return { events: [] }
-  let event: { type?: string; message?: { id?: string; content?: unknown; usage?: { input_tokens?: number } } }
+  let event: { type?: string; message?: { id?: string; content?: unknown; usage?: Usage } }
   try { event = JSON.parse(line) } catch { return { events: [] } }
   const id = event.message?.id
-  const inputTokens = event.message?.usage?.input_tokens
+  const inputTokens = conversationTokens(event.message?.usage)
   const message = event.type === 'assistant' && typeof id === 'string' && typeof inputTokens === 'number' ? { id, inputTokens } : undefined
   return { events: eventsOf(event), ...(message ? { message } : {}) }
 }
