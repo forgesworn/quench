@@ -807,3 +807,63 @@ about 20% under Opus 5 and about 5% under Sonnet 5, with the same
 behaviour assumed. The held-out tasks are short (a median of 22 requests),
 which is the regime with least to save. Q8 tests compaction timing in
 longer, dependent sessions.
+
+## Q4 addendum 2: every comparator on the held-out tasks, 23 September 2026
+
+Kev (4B and 9B, jaredpalmer/kev) and Von are Apache-2.0 open System One
+models. Their adapters were locked at `357c4e3` before any answer existed:
+Laya's snapshots, question and thresholds (0.5 and 0.8). All five judges ran
+locally on the Apple M4 over the 1,692 held-out Pro snapshots
+(sha256 `6d184b57…`), so there was no hosted spend. Jev remains unscored and
+is dropped as a comparator.
+
+Scored on the 72 held-out Pro sessions with the frozen harness, and with the
+Q6 measure: the pure gathering between a stop and the agent's next edit or
+check, counting only stops that were not premature. Each cell gives
+premature stops (of which lost evidence) / pure gathering saved:
+
+| Decider | plain (24) | Context (24) | Graphify (24) |
+| --- | --- | --- | --- |
+| `stale-5` (frozen rule) | 2 (1) / 8.0% | 0 (0) / 0.3% | 4 (1) / 1.4% |
+| `laya-50` | 24 (24) / 0% | 24 (24) / 0% | 24 (24) / 0% |
+| `laya-80` | 6 (6) / 3.5% | 24 (24) / 0% | 7 (2) / 1.2% |
+| `open-jev-9b-50` | 13 (13) / 3.7% | 6 (4) / 6.5% | 17 (16) / 0.6% |
+| `kev-4b-50` | 22 (22) / 0% | 2 (0) / 3.7% | 12 (10) / 0.1% |
+| `kev-9b-50` | 15 (15) / 1.0% | 1 (0) / 4.0% | 15 (12) / 1.9% |
+| Ceiling (first sufficient point) | 19.4% | 13.8% | 7.0% |
+
+The other variants barely stop. `open-jev-2b-50` stops 8 times, all in
+plain (3 premature, all losing evidence). `open-jev-2b-80`,
+`open-jev-9b-80` and `kev-4b-80` stop 1, 3 and 7 times, all in plain.
+`kev-9b-80`, `von-50` and `von-80` never stop, and Von's highest answer on
+any snapshot is 0.374. Over all 72 sessions, stops that lost evidence:
+`stale-5` 2, `kev-9b-50` 27, `kev-4b-50` 32, `open-jev-9b-50` 33, `laya-50`
+72.
+
+How well each probability separates sufficient from insufficient points
+(0.5 is chance; descriptive only):
+
+| Judge | Held-out Pro (1,692 points) | Flash pilot (642) | Development (2,454) |
+| --- | --- | --- | --- |
+| Laya | 0.501 | 0.546 | 0.561 (first freeze) |
+| Open-Jev 2B | 0.501 | 0.513 | 0.567 |
+| Open-Jev 9B | 0.493 | 0.491 | 0.609 |
+| Kev 4B | 0.570 | 0.565 | 0.562 |
+| Kev 9B | 0.605 | 0.646 | still running on the M4 |
+| Von | 0.483 | 0.575 | 0.588 |
+
+On the Flash pilot (24 sessions, secondary), `kev-9b-50` stops in 22
+sessions, 7 of them prematurely and all 7 losing evidence, with 0.6–1.7%
+pure gathering from its safe stops by arm. `stale-5` there loses nothing
+and leaves 0.5–2.2%.
+
+What this shows. No general judge is a safe stop decider on these tasks.
+Each one that stops often enough to save anything loses evidence in a third
+or more of the held-out Pro sessions. On held-out tasks, none separates
+sufficient from insufficient points much better than chance: the best, Kev
+9B, reaches an AUC of 0.605 (0.646 on the Flash pilot). On the Context arm, Kev 9B at 0.5 leaves more pure gathering
+to cut than `stale-5` (4.0% against 0.3%), with one premature stop that
+lost nothing. On the other two arms it loses evidence in 27 of 48
+sessions. Q4's reading holds for all five: a judge not told what evidence
+the task needs cannot see when it has been gathered. The stop-decider line
+of work ends here (Q6), so no comparator is taken further.
