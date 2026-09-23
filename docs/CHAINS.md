@@ -148,6 +148,18 @@ One repetition of both chains and all three policies on DeepSeek V4.1 Flash
 evidence only. Harness faults found in the pilot are fixed and logged
 before the counted run; the pass rules do not change.
 
+## Harness fixes after the lock
+
+1. **Cumulative `modelUsage` (pilot, 24 September 2026).** On a resumed
+   session, Claude Code reports `modelUsage` as the session's running
+   total, not the invocation's own tokens: consecutive values differ by
+   exactly each invocation's `usage`. The runner records it as it stands,
+   and its progress log prints the running totals. The scorer
+   (`src/chains.ts`, `perInvocation`) now takes each invocation's tokens
+   as the difference from the invocation before it, compaction calls
+   included, which keeps the measure as defined above. Without the fix,
+   step 1 of a chain would count six times over. The runner is unchanged.
+
 ## Estimate (for the owner, before any run)
 
 From the Q5 Pro plain sessions (0.73M raw input, about 25 requests and 32K

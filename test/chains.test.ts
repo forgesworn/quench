@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { loadReceipts, priced, rule, stepTokens, summarise, type ChainReceipt, type ChainStep } from '../src/chains.ts'
+import { loadReceipts, perInvocation, priced, rule, stepTokens, summarise, type ChainReceipt, type ChainStep } from '../src/chains.ts'
 
 const call = (fresh: number, cacheRead: number, output: number, compactions = 0) => ({
   tokens: { fresh, cacheRead, cacheWrite: 0, output },
@@ -22,9 +22,23 @@ test('a step counts the compaction the harness ran after it', () => {
   assert.deepEqual(stepTokens(step), { fresh: 15, cacheRead: 150, cacheWrite: 0, output: 4 })
 })
 
+test('cumulative session totals become each invocation\'s own tokens, compactions included', () => {
+  const receipt: ChainReceipt = { chain: 'c', arm: 'boundary', rep: 1, steps: [
+    { n: 1, call: call(10, 100, 1), compactAfter: call(12, 150, 3, 1) },
+    { n: 2, call: call(20, 400, 5) },
+    { n: 3, call: call(4, 50, 1) },
+  ] }
+  const own = perInvocation(receipt).steps
+  assert.deepEqual(stepTokens(own[0] as ChainStep), { fresh: 12, cacheRead: 150, cacheWrite: 0, output: 3 })
+  assert.deepEqual(own[1]?.call.tokens, { fresh: 8, cacheRead: 250, cacheWrite: 0, output: 2 })
+  // A total that falls was reset, so it is taken as it stands.
+  assert.deepEqual(own[2]?.call.tokens, { fresh: 4, cacheRead: 50, cacheWrite: 0, output: 1 })
+})
+
 test('summaries, pass rules and receipt loading', () => {
+  // Session totals, as the runner records them: each step adds `fresh`.
   const receipt = (arm: string, fresh: number, passed: boolean[]): ChainReceipt => ({
-    chain: 'c', arm, rep: 1, steps: passed.map((p, i) => ({ n: i + 1, call: call(fresh, 0, 0), checker: { passed: p } })),
+    chain: 'c', arm, rep: 1, steps: passed.map((p, i) => ({ n: i + 1, call: call(fresh * (i + 1), 0, 0), checker: { passed: p } })),
   })
   const dir = mkdtempSync(join(tmpdir(), 'quench-chains-'))
   const receipts = [receipt('carry', 100, [true, true, true]), receipt('boundary', 70, [true, true, false])]

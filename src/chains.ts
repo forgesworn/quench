@@ -43,13 +43,31 @@ const zero: Tokens = { fresh: 0, cacheRead: 0, cacheWrite: 0, output: 0 }
 /** Every token a step cost, including the harness's compaction after it. */
 export const stepTokens = (step: ChainStep): Tokens => (step.compactAfter ? add(step.call.tokens, step.compactAfter.tokens) : step.call.tokens)
 
+const sub = (a: Tokens, b: Tokens): Tokens => ({ fresh: a.fresh - b.fresh, cacheRead: a.cacheRead - b.cacheRead, cacheWrite: a.cacheWrite - b.cacheWrite, output: a.output - b.output })
+
+/**
+ * The runner records each invocation's `modelUsage`, which Claude Code keeps cumulative over a resumed session
+ * (found in the Q8 pilot). Each invocation's own tokens are the difference from the invocation before it, in
+ * order, compactions included. If a total ever falls, the count was reset and the value is taken as it stands.
+ */
+export function perInvocation(receipt: ChainReceipt): ChainReceipt {
+  let before = zero
+  const own = (call: Call): Call => {
+    const d = sub(call.tokens, before)
+    const reset = Object.values(d).some((v) => v < 0)
+    before = call.tokens
+    return { ...call, tokens: reset ? call.tokens : d }
+  }
+  return { ...receipt, steps: receipt.steps.map((step) => ({ ...step, call: own(step.call), ...(step.compactAfter ? { compactAfter: own(step.compactAfter) } : {}) })) }
+}
+
 export function loadReceipts(evidence: string): ChainReceipt[] {
   const out: ChainReceipt[] = []
   const walk = (dir: string, depth: number): void => {
     for (const name of readdirSync(dir).sort()) {
       const path = join(dir, name)
       if (name === 'workspace' || name === 'calls' || /\.failed-\d+$/.test(name)) continue
-      if (name === 'receipt.json') out.push(JSON.parse(readFileSync(path, 'utf8')) as ChainReceipt)
+      if (name === 'receipt.json') out.push(perInvocation(JSON.parse(readFileSync(path, 'utf8')) as ChainReceipt))
       else if (depth < 3 && statSync(path).isDirectory()) walk(path, depth + 1)
     }
   }
