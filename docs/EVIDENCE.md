@@ -241,7 +241,7 @@ is an offline comparison only.
 useful stopper here. Its answers sit above 0.5 on 1,881 of 2,070 snapshots
 (mean 0.65), so it stops at or near the first point, and the high context-arm
 rate follows the arm's longer prompt rather than the evidence. Its savings
-come almost entirely from stopping prematurely. No Q2 rule, and not the
-oracle, is compared favourably or unfavourably on savings alone. Limitation:
-the 512-token input truncates most snapshots, and one question with a fixed
-threshold does not test Laya's other question types.
+come almost entirely from premature stops, so they are not comparable with
+the rules'. Limitations: a 1,900-character snapshot is near Laya's 512-token
+input and code-heavy text may be truncated (not measured); one question with
+a fixed threshold does not test Laya's other question types.
