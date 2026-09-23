@@ -15,7 +15,8 @@ export type SessionEvent =
 /**
  * What a tool call does, from its name and input alone:
  * - write: changes a file (the answer or source);
- * - check: runs tests or validates a draft (compiler, test runner, coverage);
+ * - check: runs tests or validates a draft (compiler, test runner, coverage,
+ *   fixed-string searches that confirm a citation token);
  * - read: everything else, i.e. gathering evidence.
  */
 export type CallClass = 'read' | 'write' | 'check'
@@ -64,6 +65,8 @@ export const textOf = (content: string | ContentPart[] | undefined): string => t
 const writeTools = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
 const testCommand = /\b(npm (run )?(test|check|typecheck|build)|npm t\b|node --test|npx (tsc|vitest|jest|mocha)|tsc\b|vitest|jest|pytest|cargo (test|check|build)|go (test|vet|build)|make (test|check))/
 const answerWrite = /(>|\btee\b|\bcp\b|\bmv\b)[^|&;]*\banswer\.json\b/
+// Fixed-string searches check that a citation token is copied exactly; they gather nothing new.
+const citationCheck = /\b(grep|rg)\b[^|;&]*\s(-[a-zA-Z]*F[a-zA-Z]*|--fixed-strings)\b/
 
 export function classifyCall(name: string, input: unknown): CallClass {
   if (writeTools.has(name)) return 'write'
@@ -71,7 +74,7 @@ export function classifyCall(name: string, input: unknown): CallClass {
   if (name === 'Bash') {
     const command = typeof input === 'object' && input !== null && 'command' in input ? String((input as { command: unknown }).command) : ''
     if (answerWrite.test(command)) return 'write'
-    if (testCommand.test(command) || /\banswer\.json\b/.test(command)) return 'check'
+    if (testCommand.test(command) || citationCheck.test(command) || /\banswer\.json\b/.test(command)) return 'check'
   }
   return 'read'
 }

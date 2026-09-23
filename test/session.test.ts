@@ -10,7 +10,10 @@ test('classifies writes, checks and reads from the call alone', () => {
   assert.equal(classifyCall('Bash', { command: 'npm test 2>&1 | tail' }), 'check')
   assert.equal(classifyCall('Bash', { command: 'jq . answer.json' }), 'check')
   assert.equal(classifyCall('mcp__z1p-repository__repository_coverage', {}), 'check')
+  assert.equal(classifyCall('Bash', { command: 'grep -qF "term: token," src/a.ts && echo ok' }), 'check')
+  assert.equal(classifyCall('Bash', { command: 'rg --fixed-strings "x" src' }), 'check')
   assert.equal(classifyCall('Bash', { command: 'grep -rn openSession src' }), 'read')
+  assert.equal(classifyCall('Bash', { command: 'grep -rnE "Foo|Bar" src' }), 'read')
   assert.equal(classifyCall('Read', { file_path: 'src/a.ts' }), 'read')
 })
 
