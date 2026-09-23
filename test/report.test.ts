@@ -4,12 +4,12 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { agentReport, claudeParser, codexParser, cost, naturalCompactions, pricing, simulate, type Request, type Session } from '../src/report.ts'
+import { agentReport, claudeParser, codexParser, cost, idleRebuilds, naturalCompactions, pricing, simulate, type Request, type Session } from '../src/report.ts'
 
 const MARKER = 'zq-private-marker'
 
 const claudeLine = (id: string, usage: Record<string, unknown>, model = 'claude-sonnet-5', text = `${MARKER} content`): string =>
-  JSON.stringify({ type: 'assistant', cwd: `/home/${MARKER}/project`, message: { id, model, content: [{ type: 'text', text }], usage } })
+  JSON.stringify({ type: 'assistant', timestamp: '2026-09-23T10:00:00Z', cwd: `/home/${MARKER}/project`, message: { id, model, content: [{ type: 'text', text }], usage } })
 const codexLines = (sub: boolean, usages: Array<{ input: number; cached: number; output: number; total: number }>): string[] => [
   JSON.stringify({ type: 'session_meta', payload: { cwd: `/home/${MARKER}`, source: sub ? { subagent: { thread_spawn: {} } } : 'cli' } }),
   JSON.stringify({ type: 'turn_context', payload: { model: 'gpt-5.6', cwd: `/home/${MARKER}` } }),
@@ -36,7 +36,7 @@ test('Codex parser skips repeated counts and reads cached tokens inside input', 
   assert.deepEqual(p.requests().map((x) => [x.model, x.ctx, x.read, x.fresh, x.out]), [['gpt-5.6', 100, 60, 40, 5], ['gpt-5.6', 150, 100, 50, 7]])
 })
 
-const req = (ctx: number, read: number, out = 100, model = 'claude-sonnet-5'): Request => ({ model, ctx, read, write1h: ctx - read, write5m: 0, fresh: 0, out, think: 0 })
+const req = (ctx: number, read: number, out = 100, model = 'claude-sonnet-5', at: number | null = null): Request => ({ model, ctx, read, write1h: ctx - read, write5m: 0, fresh: 0, out, think: 0, at })
 
 test('pricing weights cache reads by model', () => {
   assert.equal(cost(req(1000, 1000, 0, 'claude-opus-5-5'), pricing.claude), 50)
@@ -63,6 +63,12 @@ test('a recorded compaction is found and not modelled twice', () => {
   assert.equal(report.compactions.count, 1)
   assert.equal(Math.round(report.subagentShare * 100), 50)
   assert.equal(report.simulation.summaryFrom, 'default')
+})
+
+test('a large context sent uncached after an hour idle is an idle rebuild', () => {
+  const hour = 3600e3
+  const s: Session = { agent: 'claude', sub: false, requests: [req(100e3, 0, 1, 'm', 0), req(101e3, 100e3, 1, 'm', 60e3), req(102e3, 0, 1, 'm', 60e3 + 2 * hour), req(103e3, 0, 1, 'm', 60e3 + 2 * hour + 1e3), req(30e3, 0, 1, 'm', 60e3 + 5 * hour)] }
+  assert.deepEqual(idleRebuilds(s).map((r) => r.ctx), [102e3])
 })
 
 test('the report prints no transcript content, project names or paths', () => {

@@ -243,10 +243,17 @@ trigger (a Quench decider) is worth building over the plain window setting.
 ### Q9: A boundary-aware compaction trigger (only if Q8 rules 1 and 2 are met)
 
 Decide, from what exists at run time, when a session has reached a task
-boundary and should compact. Deliver it where it can act: in headless and
-SDK runs the harness compacts itself, as the Q8 runner does; in interactive
-Claude Code, find out first what a hook or plugin can do, and settle for a
-prompt to the user if nothing can start a compaction.
+boundary and should compact. Deliver it where it can act:
+
+- **Headless and SDK runs:** the harness compacts itself, as the Q8 runner
+  does.
+- **Interactive Claude Code:** no hook can start a compaction, but a
+  `PreCompact` hook can block a proactive auto-compaction, and Claude Code
+  then carries on uncompacted (hooks reference, read 24 September 2026).
+  So the user sets a small auto-compact window and the Quench hook lets a
+  compaction through only at a boundary. Candidate signals: the first
+  request after a new user prompt, and a session resumed after its prompt
+  cache expired, when the whole context is written again anyway.
 
 **Done when:** the trigger is locked before scoring, beats the window
 setting on fresh chains under a locked protocol, and meets the latency

@@ -75,7 +75,7 @@ if (args.includes('--json')) {
   const range = (from: number, to: number | null, unit: (n: number) => string): string => (to === null ? `${unit(from)}+` : `${unit(from)}-${unit(to)}`)
   const name: Record<Agent, string> = { claude: 'Claude Code', codex: 'Codex' }
   const setting: Record<Agent, string> = {
-    claude: 'CLAUDE_CODE_AUTO_COMPACT_WINDOW=<tokens> (100000 to 1000000) in the env block of ~/.claude/settings.json',
+    claude: '/autocompact <size> in a session, for example /autocompact 400k (saved as autoCompactWindow; 100K to 1M), or CLAUDE_CODE_AUTO_COMPACT_WINDOW=<tokens> in scripts',
     codex: 'model_auto_compact_token_limit = <tokens> in ~/.codex/config.toml',
   }
   out(`quench report: the last ${days} days of local transcripts, aggregates only`)
@@ -89,6 +89,7 @@ if (args.includes('--json')) {
     out('  Session cost by context size at the request:')
     for (const g of r.byContext) out(`    ${range(g.from, g.to, k).padEnd(10)} ${pct(g.requestShare).padStart(4)} of requests  ${pct(g.costShare).padStart(4)} of cost`)
     if (r.compactions.count) out(`  Compactions seen: ${r.compactions.count}; median context ${k(r.compactions.medianBefore)} before, ${k(r.compactions.medianAfter)} after.`)
+    if (r.idleRebuilds.requests) out(`  Context sent again after more than an hour idle (the prompt cache had expired): ${count(r.idleRebuilds.requests, 'request')}, median ${k(r.idleRebuilds.medianContext)}, ${pct(r.idleRebuilds.costShare)} of session cost.`)
     if (r.simulation.windows.length) {
       out(`  Compacting earlier, modelled with a ${k(r.simulation.summary)} context after each compaction (${r.simulation.summaryFrom === 'your compactions' ? 'the median after your compactions' : r.simulation.summaryFrom === 'set' ? 'set by --summary' : 'a default'}):`)
       for (const w of r.simulation.windows) out(`    at ${k(w.window).padEnd(6)} ${`${(100 * w.costChange).toFixed(0)}%`.padStart(5)} cost (${pct(w.costShareAbove)} of cost is sent above this size)`)

@@ -13,6 +13,8 @@ export interface Request {
   fresh: number
   out: number
   think: number
+  /** Epoch milliseconds when the request's response was logged, if known. */
+  at: number | null
 }
 
 export interface Session {
@@ -20,6 +22,8 @@ export interface Session {
   sub: boolean
   requests: Request[]
 }
+
+const time = (stamp: string | undefined): number | null => { const t = stamp ? Date.parse(stamp) : NaN; return Number.isNaN(t) ? null : t }
 
 export interface LineParser {
   line(text: string): void
@@ -36,7 +40,7 @@ export function claudeParser(): LineParser {
   return {
     line(text) {
       if (!text.includes('"usage"')) return
-      let e: { type?: string; message?: { id?: string; model?: string; usage?: Record<string, any> } }
+      let e: { type?: string; timestamp?: string; message?: { id?: string; model?: string; usage?: Record<string, any> } }
       try { e = JSON.parse(text) } catch { return }
       const u = e.message?.usage
       const id = e.message?.id
@@ -47,7 +51,7 @@ export function claudeParser(): LineParser {
       const fresh = u.input_tokens ?? 0
       byId.set(id, {
         model: e.message?.model ?? '', ctx: fresh + write1h + write5m + read, read, write1h, write5m, fresh,
-        out: u.output_tokens ?? 0, think: u.output_tokens_details?.thinking_tokens ?? 0,
+        out: u.output_tokens ?? 0, think: u.output_tokens_details?.thinking_tokens ?? 0, at: time(e.timestamp),
       })
     },
     sub: () => false,
@@ -68,7 +72,7 @@ export function codexParser(): LineParser {
   return {
     line(text) {
       if (!text.includes('"token_count"') && !text.includes('"turn_context"') && !text.includes('"session_meta"')) return
-      let e: { type?: string; payload?: Record<string, any> }
+      let e: { type?: string; timestamp?: string; payload?: Record<string, any> }
       try { e = JSON.parse(text) } catch { return }
       const p = e.payload ?? {}
       if (e.type === 'session_meta') sub = typeof p.source === 'object' && p.source !== null && 'subagent' in p.source
@@ -81,7 +85,7 @@ export function codexParser(): LineParser {
         const input = u.input_tokens ?? 0
         const read = u.cached_input_tokens ?? 0
         const write = u.cache_write_input_tokens ?? 0
-        requests.push({ model, ctx: input, read, write1h: 0, write5m: write, fresh: Math.max(0, input - read - write), out: u.output_tokens ?? 0, think: u.reasoning_output_tokens ?? 0 })
+        requests.push({ model, ctx: input, read, write1h: 0, write5m: write, fresh: Math.max(0, input - read - write), out: u.output_tokens ?? 0, think: u.reasoning_output_tokens ?? 0, at: time(e.timestamp) })
       }
     },
     sub: () => sub,
@@ -117,6 +121,19 @@ export const cost = (r: Request, p: Pricing): number => { const x = parts(r, p);
 const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0)
 const share = (x: number, total: number): number => (total ? x / total : 0)
 export const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
+
+/**
+ * Requests that sent at least 50K of context, mostly uncached, more than an hour after the previous one: the
+ * prompt cache had expired, so the whole context was written again. A session resumed then is a cheap point
+ * to compact, because it pays for the context either way.
+ */
+export function idleRebuilds(s: Session): Request[] {
+  return s.requests.filter((r, i) => {
+    const prev = s.requests[i - 1]
+    const uncached = r.write1h + r.write5m + r.fresh
+    return i > 0 && prev?.at != null && r.at != null && r.at - prev.at > 3600e3 && r.ctx >= 50e3 && uncached >= 0.5 * r.ctx
+  })
+}
 
 /** A drop of more than 40% from at least 100K, with `span` requests either side for the growth comparison. */
 export function naturalCompactions(sessions: Session[], span = 30): Array<{ before: number; after: number; growth: number }> {
@@ -175,6 +192,7 @@ export interface AgentReport {
   bySessionLength: Array<{ from: number; to: number | null; sessions: number; costShare: number }>
   byContext: Array<{ from: number; to: number | null; requestShare: number; costShare: number }>
   compactions: { count: number; medianBefore: number; medianAfter: number; growthAfter: number }
+  idleRebuilds: { requests: number; costShare: number; medianContext: number }
   simulation: { summary: number; summaryFrom: 'your compactions' | 'default' | 'set'; windows: Array<{ window: number; costChange: number; costShareAbove: number }> }
 }
 
@@ -191,6 +209,7 @@ export function agentReport(agent: Agent, sessions: Session[], summaryOverride?:
   const mainCost = sum(mainRequests.map((r) => cost(r, p)))
   const within = (x: number, [lo, hi]: [number, number | null]): boolean => x >= lo && (hi === null || x < hi)
   const drops = naturalCompactions(main)
+  const rebuilt = main.flatMap(idleRebuilds)
   const measured = drops.length >= 10 ? median(drops.map((d) => d.after)) : null
   const summary = summaryOverride ?? measured ?? 30e3
   const none = sum(main.map((s) => simulate(s, p, null, summary)))
@@ -223,6 +242,7 @@ export function agentReport(agent: Agent, sessions: Session[], summaryOverride?:
       return { from, to, requestShare: share(group.length, mainRequests.length), costShare: share(sum(group.map((r) => cost(r, p))), mainCost) }
     }),
     compactions: { count: drops.length, medianBefore: median(drops.map((d) => d.before)), medianAfter: median(drops.map((d) => d.after)), growthAfter: median(drops.map((d) => d.growth)) },
+    idleRebuilds: { requests: rebuilt.length, costShare: share(sum(rebuilt.map((r) => cost(r, p))), mainCost), medianContext: median(rebuilt.map((r) => r.ctx)) },
     simulation: { summary, summaryFrom: summaryOverride !== undefined ? 'set' : measured !== null ? 'your compactions' : 'default', windows },
   }
 }

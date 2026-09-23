@@ -896,3 +896,16 @@ content, project name or path reaches the output, text or JSON.
 
 These are upper bounds with the agent's behaviour held fixed. Q8 measures
 what compacting costs in accepted work.
+
+- **Idle rebuilds:** 166 requests (6% of main-session cost on Claude Code,
+  median context 318K) sent at least 50K of context, mostly uncached, more
+  than an hour after the previous request. The prompt cache had expired,
+  so the session paid to write its whole context again. Compacting at that
+  point costs about the same as the rebuild it replaces, and it shrinks
+  every request after it.
+- **Delivery in interactive Claude Code** (hooks reference, read 24
+  September 2026): no hook can start a compaction. A `PreCompact` hook can
+  block a proactive auto-compaction, after which the session continues
+  uncompacted. A small auto-compact window with a hook that lets a
+  compaction through only at a boundary is therefore a way to deliver a
+  boundary trigger (GOALS Q9).
