@@ -7,7 +7,8 @@ import { createReadStream, existsSync, readdirSync, readFileSync, statSync } fro
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { agentReport, claudeParser, codexParser, type Agent, type AgentReport, type LineParser, type Session } from './report.ts'
+import { agentReport, claudeParser, codexParser, premiumSubagentShare, type Agent, type AgentReport, type LineParser, type Session } from './report.ts'
+import { quenchHome, readState } from './settings.ts'
 
 const args = process.argv.slice(2)
 const option = (name: string): string | undefined => { const at = args.indexOf(name); return at >= 0 ? args[at + 1] : undefined }
@@ -66,6 +67,7 @@ function subagentType(path: string): string | undefined {
 }
 
 const reports: Array<AgentReport & { otherModelRequests: number }> = []
+const sessionsBy: Partial<Record<Agent, Session[]>> = {}
 for (const agent of ['claude', 'codex'] as const) {
   if (agentOption !== 'all' && agentOption !== agent) continue
   const files = transcripts(roots[agent], agent === 'claude' ? 3 : 4)
@@ -78,11 +80,34 @@ for (const agent of ['claude', 'codex'] as const) {
     if (process.stderr.isTTY) process.stderr.write(`\r${agent}: ${done}/${files.length} transcripts`)
   }
   if (process.stderr.isTTY && files.length) process.stderr.write('\r\x1b[K')
+  sessionsBy[agent] = sessions
   if (sessions.length) reports.push({ ...agentReport(agent, sessions, summary), otherModelRequests: skipped[agent] })
 }
 
+const state = readState()
+const day = (iso: string): string => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+function appliedLines(): string[] {
+  const lines: string[] = []
+  const sub = state.applied['subagent-model']
+  if (sub) {
+    const at = Date.parse(sub.at)
+    const before = premiumSubagentShare(sessionsBy.claude ?? [], since, at)
+    const after = premiumSubagentShare(sessionsBy.claude ?? [], at, Infinity)
+    lines.push(`subagent-model since ${day(sub.at)}: subagents on models dearer than Sonnet 5 took ${Math.round(100 * after.share)}% of cost (${after.requests.toLocaleString('en-GB')} requests), against ${Math.round(100 * before.share)}% before.`)
+  }
+  const guard = state.applied['break-guard']
+  if (guard) {
+    let held: Array<{ at: string; usd?: number | null }> = []
+    try { held = readFileSync(join(quenchHome(), 'guard.log'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) } catch {}
+    held = held.filter((h) => Date.parse(h.at) >= Date.parse(guard.at))
+    const usd = held.reduce((a, h) => a + (h.usd ?? 0), 0)
+    lines.push(`break-guard since ${day(guard.at)}: held ${held.length} prompt${held.length === 1 ? '' : 's'} after a break${held.length ? `; sending each straight away would have written about $${usd.toFixed(2)} in all` : ''}.`)
+  }
+  return lines
+}
+
 if (args.includes('--json')) {
-  process.stdout.write(`${JSON.stringify({ days, reports }, null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify({ days, reports, applied: appliedLines() }, null, 2)}\n`)
 } else {
   const out = (line = ''): void => { process.stdout.write(`${line}\n`) }
   const pct = (x: number): string => `${Math.round(100 * x)}%`
@@ -113,10 +138,12 @@ if (args.includes('--json')) {
         out(`  ${n}. After a break of more than an hour, start new work in a fresh session (/clear) instead of carrying on.`)
         out(`     ${count(Number(f.breaks), 'time')} you came back to a session whose prompt cache had expired, so its whole context (median ${k(Number(f.medianContext))}) was written again at 2x.`)
         out(`     A fresh session writes only its ${k(Number(f.basePrompt))} base prompt: up to ${money(a.saving)} (${pct(a.share)}) if the work was new. Keep the session when you are continuing the same task.`)
+        if (r.agent === 'claude') out(state.applied['break-guard'] ? `     Applied: the break guard has been on since ${day(state.applied['break-guard'].at)}.` : '     Do it: quench apply break-guard (holds the first prompt after such a break once, with its cost)')
       } else if (a.id === 'subagent-model') {
         out(`  ${n}. Run subagents on Sonnet 5 unless the task needs a stronger model (the model setting on the Agent tool, or CLAUDE_CODE_SUBAGENT_MODEL=sonnet).`)
         out(`     Subagents on dearer models cost ${money(Number(f.premiumCost))} (${pct(Number(f.premiumShare))}), most of it ${f.topType === 'custom' ? 'custom agents' : `${f.topType} agents`} (${money(Number(f.topTypeCost))}).`)
         out(`     The same tokens on Sonnet 5 would cost ${money(a.saving)} (${pct(a.share)}) less. The quality of the switch is not measured.`)
+        out(state.applied['subagent-model'] ? `     Applied on ${day(state.applied['subagent-model'].at)}; see Applied below.` : '     Do it: quench apply subagent-model')
       } else if (a.id === 'effort') {
         out(`  ${n}. Do not lower reasoning effort to save money: thinking is only ${pct(a.share)} of cost (${pct(r.components.thinkingShareOfOutput)} of output tokens), so lowering ${effortSetting[r.agent]} saves at most that.`)
       } else if (a.id === 'keep-window') {
@@ -124,6 +151,12 @@ if (args.includes('--json')) {
         out('     compacting at task boundaries cost 16% more and lost accepted steps; above 200K is untested.')
       }
       out(`     Evidence: ${a.evidence}.`)
+    }
+
+    const applied = r.agent === 'claude' ? appliedLines() : []
+    if (applied.length) {
+      out('\n  Applied')
+      for (const line of applied) out(`    ${line}`)
     }
 
     out('\n  Where the cost goes')

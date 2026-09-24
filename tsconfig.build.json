@@ -6,5 +6,5 @@
     "rootDir": "src",
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/report.ts", "src/cli-report.ts"]
+  "include": ["src/report.ts", "src/cli-report.ts", "src/settings.ts", "src/guard.ts", "src/cli.ts"]
 }

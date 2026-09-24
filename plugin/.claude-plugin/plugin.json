@@ -1,0 +1,23 @@
+{
+  "name": "quench",
+  "version": "0.1.0",
+  "description": "See where your Claude Code and Codex spend goes, apply the changes that save the most, and get a warning before a break costs you a full context rewrite.",
+  "author": { "name": "TheCryptoDonkey" },
+  "homepage": "https://github.com/forgesworn/quench",
+  "license": "MIT",
+  "userConfig": {
+    "break_guard": {
+      "type": "boolean",
+      "title": "Break guard",
+      "description": "After a break longer than the prompt cache lasts, hold the first prompt to a large session once and say what sending it will cost.",
+      "default": true
+    },
+    "guard_min_context": {
+      "type": "number",
+      "title": "Break guard: smallest context",
+      "description": "Sessions below this many tokens of context are never held.",
+      "default": 100000,
+      "min": 20000
+    }
+  }
+}

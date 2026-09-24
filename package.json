@@ -9,6 +9,7 @@
     "node": ">=24.0.0"
   },
   "bin": {
+    "quench": "dist/cli.js",
     "quench-report": "dist/cli-report.js"
   },
   "files": [
@@ -17,13 +18,14 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "build": "tsc -p tsconfig.build.json",
+    "build:plugin": "tsc -p tsconfig.build.json --outDir plugin/dist",
     "prepack": "npm run build",
     "test": "node --test \"test/**/*.test.ts\"",
     "check": "npm run typecheck && npm test",
     "data": "node src/cli-data.ts",
     "score": "node src/cli-score.ts",
     "estimate": "node src/cli-estimate.ts",
-    "report": "node src/cli-report.ts"
+    "report": "node src/cli.ts report"
   },
   "devDependencies": {
     "@types/node": "24.13.6",

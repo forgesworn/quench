@@ -211,6 +211,12 @@ Q6 did not pass, so the stop hint is not packaged. What is shipped instead:
 3. **A release** as an npm package and a Claude Code plugin, through the
    authorised process only and with the owner's go-ahead.
 
+**Status (24 September 2026):** built and tested, not published. `quench`
+reports ranked actions priced at list prices, applies and undoes the two
+setting changes (`subagent-model`, `break-guard`) with a backup, measures
+spend before and after a change, and ships as a Claude Code plugin
+(validated, loaded in a live session). Publishing waits for the owner.
+
 **Done when:** `quench report` is tested (parsers, pricing, simulation, and a
 test that no transcript content or project name reaches the output), runs
 on both agents' transcripts, reproduces the Q8 motivation figures, and its

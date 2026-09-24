@@ -327,3 +327,12 @@ export function agentReport(agent: Agent, sessions: Session[], summaryOverride?:
     actions,
   }
 }
+
+/** Share of all cost that went to subagents on models dearer than Sonnet 5, over requests logged in [from, to). */
+export function premiumSubagentShare(sessions: Session[], from: number, to: number): { share: number; requests: number } {
+  const p = pricing.claude
+  const inRange = (r: Request): boolean => r.at !== null && r.at >= from && r.at < to
+  const all = sessions.flatMap((s) => s.requests.filter(inRange))
+  const premium = sessions.filter((s) => s.sub).flatMap((s) => s.requests.filter(inRange)).filter((r) => cost(r, p) > costOn(r, p, SONNET_5))
+  return { share: share(sum(premium.map((r) => cost(r, p))), sum(all.map((r) => cost(r, p)))), requests: all.length }
+}

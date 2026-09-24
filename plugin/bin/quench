@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+// The quench command, on PATH while the plugin is enabled.
+await import('../dist/cli.js')

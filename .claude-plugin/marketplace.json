@@ -1,0 +1,16 @@
+{
+  "name": "quench",
+  "owner": {
+    "name": "TheCryptoDonkey"
+  },
+  "metadata": {
+    "description": "Quench: find what your coding agent spends money on, and change it."
+  },
+  "plugins": [
+    {
+      "name": "quench",
+      "source": "./plugin",
+      "description": "See where your Claude Code and Codex spend goes, apply the changes that save the most, and get a warning before a break costs you a full context rewrite."
+    }
+  ]
+}

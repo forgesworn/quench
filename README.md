@@ -17,13 +17,31 @@ compaction policy is recommended. Sessions above 200K were not tested.
 Private and experimental. No saving is claimed until the benchmark has
 measured it.
 
-## `quench report`
+## Use
+
+As a Claude Code plugin (the break guard is on by default and can be turned
+off under the plugin in `/config`):
 
 ```sh
-node src/cli-report.ts                  # Claude Code and Codex, the last 30 days
-node src/cli-report.ts --agent claude --days 7
-node src/cli-report.ts --json
+/plugin marketplace add forgesworn/quench
+/plugin install quench@quench
+/quench:report
 ```
+
+Or from the command line, in a clone (Node 24):
+
+```sh
+node src/cli.ts                               # the report: ranked actions from your transcripts
+node src/cli.ts report --agent claude --days 7 --json
+node src/cli.ts apply subagent-model          # shows the change; add --yes to make it
+node src/cli.ts apply break-guard --yes       # the break guard as a hook in ~/.claude/settings.json
+node src/cli.ts undo subagent-model --yes     # puts it back (every change is backed up first)
+```
+
+After a change, the report's **Applied** section compares spend since the
+change with spend before it, so a saving is measured rather than assumed.
+
+### The report
 
 It reads the transcripts Claude Code (`~/.claude/projects`) and Codex
 (`~/.codex/sessions`) keep on your machine, and prints:
@@ -34,6 +52,10 @@ It reads the transcripts Claude Code (`~/.claude/projects`) and Codex
   example: run subagents on Sonnet 5 unless the task needs more; start new
   work in a fresh session after a break longer than the prompt cache
   lasts; do not lower effort or shrink the compaction window to save money.
+- **the break guard**: after a break longer than the prompt cache lasts,
+  the first prompt to a session of 100K tokens or more is held once, with
+  what sending it will cost. Run `/clear` for new work, or send it again to
+  carry on;
 - where the cost went: cache reads, writes and output, subagents, models,
   session length and the context size each request sent;
 - the compactions your sessions already made, and what compacting at a
@@ -87,7 +109,7 @@ steps are necessary (writing the answer, running tests).
 
 See [the goals](GOALS.md) and [the benchmark design](docs/BENCHMARK.md).
 
-### Use
+### Research commands
 
 ```sh
 npm run check
