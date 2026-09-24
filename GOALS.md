@@ -235,6 +235,11 @@ per chain: carry everything, compact at a fixed window, and compact at every
 step boundary. Price cost with published cache and output multipliers, not
 raw tokens.
 
+**Status (24 September 2026): not met**, recorded in `docs/EVIDENCE.md`.
+Up to about 110K of context, boundary compaction cost 16% more than
+carrying the session and lost 7 of 36 accepted steps; the chains disagreed.
+The 200K+ regime is untested.
+
 **Done when:** the protocol in [docs/CHAINS.md](docs/CHAINS.md) is locked
 before any counted run, the runs are recorded, and the result is written up
 with per-chain and per-step spread. It must say whether a boundary-aware

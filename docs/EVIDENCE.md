@@ -955,3 +955,60 @@ of hundreds of requests, which these chains do not reach. The counted Pro
 run goes ahead as locked. The modelled savings in `quench report` leave
 out the tax of reading again after a compaction, and they need
 calibrating against these runs before anyone relies on them.
+
+## Q8 verdict: compaction timing on DeepSeek V4 Pro, 24 September 2026
+
+Status: **not met.** Under `docs/CHAINS.md` (locked at `e99c152`, harness
+fixes 1 and 2 logged there before this run), compacting at task boundaries
+cost more than carrying the whole session and lost accepted steps. The
+fixed 100K window also lost accepted steps and saved nothing.
+
+- **Recording:** 18 of 18 chain runs (2 chains × 3 policies × 3
+  repetitions), `deepseek-v4-pro:cloud`, runner sha256 `b27a10c5…`. None
+  failed to complete and none was rerun. The first attempt, started before
+  harness fix 2, was stopped during its first chain run and set aside
+  unscored.
+
+| Rule | Result |
+| --- | --- |
+| 1. Boundary against carry: at least 25% lower priced cost, accepted ≥ carry − 2 | **fail:** cost +16.4%, accepted 23 against 30 |
+| 2. Boundary against threshold: at least 10% lower, accepted ≥ threshold − 2 | **fail:** cost +12.3%, accepted 23 against 24 |
+| Threshold against carry (reported) | cost +3.6%, accepted 24 against 30 |
+
+| Chain, policy | Accepted | Priced (M units) | Raw tokens | Compactions | Median context before → after |
+| --- | ---: | ---: | ---: | ---: | --- |
+| commander, carry | 15/18 | 2.92 | 12.6M | 0 | |
+| commander, threshold | 9/18 | 3.33 | 11.5M | 5 | 69K → 14K |
+| commander, boundary | 6/18 | 4.36 | 13.1M | 15 | 33K → 9K |
+| markdown-it, carry | 15/18 | 3.33 | 16.3M | 0 | |
+| markdown-it, threshold | 15/18 | 3.15 | 9.8M | 4 | 67K → 17K |
+| markdown-it, boundary | 17/18 | 2.92 | 6.2M | 15 | 38K → 10K |
+
+- **Context:** carry peaked at 89K on commander and 106K on markdown-it
+  (step means). The 100K window compacted automatically at about 68K.
+- **The compaction calls are cheap:** after harness fix 2 each read about
+  40K from the cache, missed 1.3K and wrote a 3.5–3.8K summary, about 0.37M
+  units for 15. Boundary's excess on commander is its own later work: step
+  calls 3.99 against carry's 2.92.
+- **The chains disagree.** On markdown-it, boundary was 12% cheaper than
+  carry and accepted two more steps: carry missed the same file in step 4
+  in all three runs, and boundary missed it once. On commander, boundary
+  was 49% dearer and accepted 9 fewer.
+- **Where accepted steps were lost:** step 1 runs before any compaction,
+  so it measures run-to-run spread: carry 4 of 6, threshold 3, boundary 3.
+  In steps 2 to 6, carry was accepted 26 of 30, threshold 21 and boundary
+  20. After a compaction, answers that must quote the source verbatim came
+  back with blank evidence 4 times under boundary and twice under
+  threshold, never under carry. One boundary run reported a test title
+  that step 3 had not added. One boundary run on commander repaired the
+  wrong file in step 3, and its later steps failed in cascade.
+
+What this shows. In sessions up to about 110K of context, compacting at
+task boundaries neither saves money nor keeps quality reliably. The saved
+cache reads, at 0.1×, are small at this size, and the agent works more
+afterwards. Details that must be exact (verbatim quotes, earlier test
+titles) are what a summary loses. The owner's cost sits mostly above 200K,
+where each compaction removes far more; this run does not test that
+regime, so it says nothing either way about compacting at 400K. By the
+reading locked in the protocol, compaction timing is not the lever on this
+evidence, and no boundary trigger (Q9) is built on it.
