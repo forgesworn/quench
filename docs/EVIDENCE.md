@@ -849,13 +849,15 @@ How well each probability separates sufficient from insufficient points
 | Open-Jev 2B | 0.501 | 0.513 | 0.567 |
 | Open-Jev 9B | 0.493 | 0.491 | 0.609 |
 | Kev 4B | 0.570 | 0.565 | 0.562 |
-| Kev 9B | 0.605 | 0.646 | still running on the M4 |
+| Kev 9B | 0.605 | 0.646 | 0.608 |
 | Von | 0.483 | 0.575 | 0.588 |
 
 On the Flash pilot (24 sessions, secondary), `kev-9b-50` stops in 22
 sessions, 7 of them prematurely and all 7 losing evidence, with 0.6–1.7%
 pure gathering from its safe stops by arm. `stale-5` there loses nothing
-and leaves 0.5–2.2%.
+and leaves 0.5–2.2%. On the development set (completed after this entry
+was first written), `kev-9b-50` stops in 72 of 135 sessions, 28
+prematurely and 20 losing evidence.
 
 What this shows. No general judge is a safe stop decider on these tasks.
 Each one that stops often enough to save anything loses evidence in a third
