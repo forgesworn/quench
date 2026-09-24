@@ -77,7 +77,7 @@ test('the report prints no transcript content, project names or paths', () => {
   const codexRoot = join(dir, 'codex')
   mkdirSync(join(claudeRoot, `-home-${MARKER}-project`), { recursive: true })
   mkdirSync(join(codexRoot, '2026', '09', '23'), { recursive: true })
-  const lines = Array.from({ length: 80 }, (_, i) => claudeLine(`m${i}`, { input_tokens: 1, cache_read_input_tokens: 50e3 + i * 10e3, cache_creation: { ephemeral_1h_input_tokens: 10e3 }, cache_creation_input_tokens: 10e3, output_tokens: 200 }))
+  const lines = Array.from({ length: 80 }, (_, i) => claudeLine(`m${i}`, { input_tokens: 1, cache_read_input_tokens: 50e3 + i * 10e3, cache_creation: { ephemeral_1h_input_tokens: 10e3 }, cache_creation_input_tokens: 10e3, output_tokens: 200 }, i === 79 ? 'deepseek-v4-pro:cloud' : 'claude-sonnet-5'))
   writeFileSync(join(claudeRoot, `-home-${MARKER}-project`, `${MARKER}.jsonl`), `${lines.join('\n')}\n`)
   const usages = Array.from({ length: 80 }, (_, i) => ({ input: 50e3 + i * 5e3, cached: 45e3 + i * 5e3, output: 300, total: (i + 1) * 1e6 }))
   writeFileSync(join(codexRoot, '2026', '09', '23', `rollout-${MARKER}.jsonl`), `${codexLines(false, usages).join('\n')}\n`)
@@ -85,6 +85,7 @@ test('the report prints no transcript content, project names or paths', () => {
     const run = spawnSync(process.execPath, ['src/cli-report.ts', '--claude-root', claudeRoot, '--codex-root', codexRoot, ...extra], { encoding: 'utf8' })
     assert.equal(run.status, 0, run.stderr)
     assert.match(run.stdout, extra.length ? /"agent": "codex"/ : /Codex: 1 session, 0 subagent transcripts/)
+    assert.match(run.stdout, extra.length ? /"otherModelRequests": 1/ : /Claude Code: 1 session, 0 subagent transcripts, 79 requests/)
     for (const secret of [MARKER, dir, 'home']) assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false, `output contains ${secret}`)
   }
 })

@@ -21,6 +21,7 @@ const roots: Record<Agent, string> = {
   codex: option('--codex-root') ?? join(homedir(), '.codex', 'sessions'),
 }
 const since = Date.now() - days * 864e5
+const skipped: Record<Agent, number> = { claude: 0, codex: 0 }
 
 function transcripts(root: string, depth: number): string[] {
   const out: string[] = []
@@ -44,12 +45,15 @@ async function read(agent: Agent, path: string): Promise<Session | null> {
   try {
     for await (const line of createInterface({ input: createReadStream(path), crlfDelay: Infinity })) parser.line(line)
   } catch { return null }
-  const requests = parser.requests()
+  // Claude Code can route to other models (a gateway, a local server); their prices differ, so they are left out.
+  const all = parser.requests()
+  const requests = agent === 'claude' ? all.filter((r) => r.model.startsWith('claude')) : all
+  skipped[agent] += all.length - requests.length
   const sub = agent === 'claude' ? path.includes('/subagents/') : parser.sub()
   return requests.length ? { agent, sub, requests } : null
 }
 
-const reports: AgentReport[] = []
+const reports: Array<AgentReport & { otherModelRequests: number }> = []
 for (const agent of ['claude', 'codex'] as const) {
   if (agentOption !== 'all' && agentOption !== agent) continue
   const files = transcripts(roots[agent], agent === 'claude' ? 3 : 4)
@@ -62,7 +66,7 @@ for (const agent of ['claude', 'codex'] as const) {
     if (process.stderr.isTTY) process.stderr.write(`\r${agent}: ${done}/${files.length} transcripts`)
   }
   if (process.stderr.isTTY && files.length) process.stderr.write('\r\x1b[K')
-  if (sessions.length) reports.push(agentReport(agent, sessions, summary))
+  if (sessions.length) reports.push({ ...agentReport(agent, sessions, summary), otherModelRequests: skipped[agent] })
 }
 
 if (args.includes('--json')) {
@@ -82,7 +86,7 @@ if (args.includes('--json')) {
   if (!reports.length) out('\nNo transcripts found.')
   for (const r of reports) {
     out(`\n${name[r.agent]}: ${count(r.sessions, 'session')}, ${count(r.subagentTranscripts, 'subagent transcript')}, ${count(r.requests, 'request')}`)
-    out(`  Priced at ${r.pricing}.`)
+    out(`  Priced at ${r.pricing}.${r.otherModelRequests ? ` Left out: ${count(r.otherModelRequests, 'request')} to non-Claude models, which are priced differently.` : ''}`)
     out(`  Where the cost goes: cache reads ${pct(r.components.cacheReads)}, cache writes and fresh input ${pct(r.components.writesAndFresh)}, output ${pct(r.components.output)}${r.components.thinkingShareOfOutput ? ` (thinking is ${pct(r.components.thinkingShareOfOutput)} of output tokens)` : ''}; subagents ${pct(r.subagentShare)}.`)
     out('  Session cost by session length (requests):')
     for (const g of r.bySessionLength) out(`    ${range(g.from, g.to, String).padEnd(10)} ${String(g.sessions).padStart(5)} sessions  ${pct(g.costShare).padStart(4)} of cost`)
