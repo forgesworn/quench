@@ -1,0 +1,61 @@
+{
+  "format": "quench-q10-lane-record-v1",
+  "recordedAt": "2026-09-24",
+  "source": "forgesworn/quench docs/LANES.md (locked at a9f61ae, amendment 1) and docs/EVIDENCE.md, Q10 verdict",
+  "purpose": "Evidence for Oathrun's model-selection table (docs/MODEL-ROUTING-GOALS.md, G3b): how often each cheaper lane delivers an accepted result, at what cost and time, next to DeepSeek V4 Pro. Evidence, not authority: it does not review or activate an Oathrun lane.",
+  "harness": {
+    "client": "Claude Code 2.1.281 headless, Q5 held-out flags and disallowed tools, effort medium",
+    "route": "Ollama daemon's Anthropic-compatible endpoint (cloud tags proxied to ollama.com)",
+    "acceptance": "deterministic checkers (and a scope check for code), no model reviewer",
+    "tasks": "Q5 held-out pack on commander.js and markdown-it, plain arm: orientation, diagnosis, impact, code change (2 tasks x 3 repetitions per class); Q8 chains under carry: six dependent steps per repository, 3 repetitions",
+    "notOathrun": "Measures model capability on these tasks, not an Oathrun lane, journey, disclosure boundary or provider-policy standing."
+  },
+  "rates": {
+    "readOn": "2026-09-24",
+    "tier": "peak",
+    "usdPerMillion": {
+      "deepseek-v4-pro:cloud": { "input": 1.32, "cached": 0.044, "output": 3.96 },
+      "deepseek-v4.1-flash:cloud": { "input": 0.30, "cached": 0.006, "output": 1.20 },
+      "glm-5.3-flash:cloud": { "input": 0.15, "cached": 0.03, "output": 0.50 }
+    },
+    "sources": ["https://ollama.com/library/deepseek-v4-pro", "https://ollama.com/library/deepseek-v4.1-flash", "https://ollama.com/library/glm-5.3-flash"]
+  },
+  "lanes": {
+    "deepseek-v4-pro:cloud": {
+      "role": "reference (Q5 and Q8 recordings)",
+      "q5": { "orientation": "6/6", "diagnosis": "6/6", "impact": "6/6", "codeChange": "6/6", "usdPerAccepted": 0.202, "medianSeconds": 135 },
+      "chains": { "accepted": "30/36", "usdPerAcceptedStep": 0.125, "minutesPerRun": 8.6 }
+    },
+    "deepseek-v4.1-flash:cloud": {
+      "qualified": ["orientation", "diagnosis", "impact", "code change", "dependent chains"],
+      "q5": { "orientation": "6/6", "diagnosis": "6/6", "impact": "6/6", "codeChange": "5/6", "usdPerAccepted": 0.036, "medianSeconds": 225 },
+      "chains": { "accepted": "33/36", "usdPerAcceptedStep": 0.023, "minutesPerRun": 11.9 },
+      "laneTotalUsd": 1.58
+    },
+    "glm-5.3-flash:cloud": {
+      "qualified": ["orientation", "diagnosis", "impact", "code change", "dependent chains"],
+      "q5": { "orientation": "6/6", "diagnosis": "5/6", "impact": "6/6", "codeChange": "6/6", "usdPerAccepted": 0.081, "medianSeconds": 306, "codeChangeMedianSeconds": 810 },
+      "chains": { "accepted": "33/36", "usdPerAcceptedStep": 0.057, "minutesPerRun": 14.7 },
+      "laneTotalUsd": 3.74
+    },
+    "qwen3.8:latest": {
+      "role": "withdrawn after two probes (M4, no token charge)",
+      "probes": [
+        { "task": "orientation-commander", "thinking": "model default (on)", "accepted": true, "seconds": 2213, "outputTokens": 37757 },
+        { "task": "orientation-commander", "thinking": "disabled", "accepted": false, "seconds": 2498, "outputTokens": 15390 }
+      ],
+      "reason": "About 40 minutes a session on a host that serves one request at a time and also serves a live agent; per-turn latency at long context, not thinking, sets the pace. Qualifying would take about 30 hours to show a saving of cents per task against Flash."
+    }
+  },
+  "findings": [
+    "Flash matched Pro on every class and on dependent chains at about a fifth of Pro's cost per accepted result.",
+    "GLM matched Pro too, at about two fifths of Pro's cost and more slowly (code change median 810 s against Flash's 242 s).",
+    "On this Ollama build (0.34.2), a request with no thinking control lets Qwen 3.8 think; only an explicit disabled setting turns it off. A lane that sends no control is thinking.",
+    "Markdown-it chain step 4 under carry was accepted once in nine runs across all three lanes: a task to review, not a lane difference."
+  ],
+  "limits": [
+    "Two repositories, three repetitions, one harness.",
+    "No frontier baseline was run (owner's decision): the lanes are shown to match DeepSeek Pro, not a frontier model.",
+    "Costs are estimates from reported tokens at published rates, not invoices."
+  ]
+}

@@ -311,6 +311,13 @@ accepted result, at what cost and wall time, next to DeepSeek V4 Pro?
   governs Oathrun's use. Two repositories and small samples: evidence for
   these task classes only.
 
+**Status (24 September 2026): met**, recorded in `docs/EVIDENCE.md`.
+DeepSeek V4.1 Flash and GLM 5.3 Flash each qualify for every task class
+and for dependent chains, Flash at about a fifth of Pro's cost per accepted
+result. Qwen 3.8 was withdrawn after two probes (about 40 minutes a
+session on the M4). No frontier baseline was run, by the owner's decision.
+The record for Oathrun is `docs/records/q10-lanes-2026-09-24.json`.
+
 **Done when:** the protocol is locked, the runs are recorded, and the
 result is written up per lane and task class with its spread, plus a short
 record the Oathrun owner can file with that project's evidence.
@@ -342,6 +349,10 @@ host enforces it, so the model is never asked to comply.
 the latency budgets, and written up with whether Oathrun should consume it
 as a typed, host-checkable fact. With fewer than ten rejected cheaper-lane
 sessions, Q11 reports that and waits for more.
+
+**Status (24 September 2026): waiting.** Q10's cheaper lanes were rejected
+in 2 of 48 Q5 sessions and missed 6 of 72 chain steps, below the bar to
+start. Harder tasks are needed.
 
 ## Order and handoff
 

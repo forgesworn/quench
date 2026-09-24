@@ -1166,3 +1166,49 @@ dependent chains, taking a little longer per session. It is evidence for
 moving "agreed ordinary implementation" to Flash in Oathrun's table, with
 Pro kept for escalation; two repositories and small samples, so for these
 task classes only, and no frontier baseline was run.
+
+## Q10 verdict: two cheaper lanes qualify, 24 September 2026
+
+Status: **met** as specified in `GOALS.md`. Under [LANES.md](LANES.md)
+(locked at `a9f61ae`, amendment 1 withdrawing Qwen before any counted
+session), both hosted lanes completed three repetitions with no session
+failing to complete and none rerun. Both qualify for every Q5 task class
+and for dependent work. Dollars at the published peak rates read on 24
+September 2026.
+
+| Lane | Q5 accepted | Q5 per accepted | Q5 median s | Chain steps accepted | Chain per accepted step | Minutes per chain run | Lane total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| DeepSeek V4 Pro (reference) | 24/24 | $0.202 | 135 | 30/36 | $0.125 | 8.6 | $8.58 |
+| DeepSeek V4.1 Flash | 23/24 | $0.036 | 225 | 33/36 | $0.023 | 11.9 | $1.58 |
+| GLM 5.3 Flash | 23/24 | $0.081 | 306 | 33/36 | $0.057 | 14.7 | $3.74 |
+| Qwen 3.8 on the M4 (two probes only) | 1/2 | no token charge | about 2,350 | not run | | | |
+
+GLM by class: orientation 6, diagnosis 5, impact 6, code change 6 of 6;
+code change took a median 810 seconds against Flash's 242. On the chains,
+GLM took every commander step and missed markdown-it step 4 in all three
+runs.
+
+- **A task to look at:** markdown-it step 4 under carry was accepted once
+  in nine runs over the three lanes (Pro 0, Flash 1, GLM 0). The Q8 write-up
+  found carry missing the same file there each time. That points at the
+  step's wording or checker rather than a lane, and it affects every lane
+  alike, so the verdict stands.
+- **Limits:** two repositories, three repetitions, one harness (Claude
+  Code on Ollama's endpoint, not an Oathrun lane), and no frontier
+  baseline by the owner's decision: the lanes are shown to match Pro on
+  these tasks, not a frontier model.
+
+What this shows. On bounded orientation, diagnosis, impact and code-change
+tasks and on six-step dependent chains, the cheaper hosted lanes deliver
+what DeepSeek Pro delivers. Flash does it at about a fifth of Pro's cost
+per accepted result, GLM at about two fifths and more slowly. For Oathrun,
+this supports Flash as the lane for ordinary implementation, GLM as its
+fallback, and Pro for escalation; it says nothing about work that needs a
+frontier model.
+
+**Q11 is short of data.** Across the counted sessions the cheaper lanes
+were rejected twice on Q5 (Flash once, GLM once) and missed six chain
+steps, three of them the step every lane misses. That is below the ten
+rejected sessions Q11 set before it starts, so Q11 waits. The finding is
+itself useful: on these tasks the cheaper lanes rarely fail, so an
+escalation trigger would rarely fire; harder tasks are needed to test one.
