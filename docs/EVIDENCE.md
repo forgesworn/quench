@@ -1133,3 +1133,36 @@ Pro at about $0.20 and Flash at about $0.03 per accepted result: the lane
 is withdrawn before any counted session ([LANES.md](LANES.md), amendment
 1). Finding for Oathrun: its Qwen lane sends no thinking control, so on
 this Ollama build Qwen thinks by default.
+
+## Q10: the Flash lane, 24 September 2026
+
+`deepseek-v4.1-flash:cloud` under [LANES.md](LANES.md), three fresh
+repetitions, none failed to complete or rerun. **Qualified for every Q5
+task class and for dependent work.** Dollars at the published peak rates
+read on 24 September 2026, from each session's own usage.
+
+| Task class (6 sessions each) | Flash accepted | Pro accepted | Flash per accepted | Pro per accepted | Flash median s | Pro median s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| orientation | 6 | 6 | $0.035 | $0.255 | 225 | 166 |
+| diagnosis | 6 | 6 | $0.030 | $0.085 | 219 | 111 |
+| impact | 6 | 6 | $0.028 | $0.088 | 150 | 134 |
+| code change | 5 | 6 | $0.055 | $0.379 | 242 | 331 |
+| **all 24** | **23** | **24** | **$0.036** | **$0.202** | 225 | 135 |
+
+| Chains, carry (36 steps) | Accepted | Dollars | Per accepted step | Minutes per run |
+| --- | ---: | ---: | ---: | ---: |
+| Flash | 33 | $0.74 | $0.023 | 11.9 |
+| Pro (Q8) | 30 | $3.74 | $0.125 | 8.6 |
+
+- Flash's one Q5 rejection was a code change; one Pro code-change session
+  hit the turn limit and was still accepted.
+- On the chains, Flash missed markdown-it step 4 in two of three runs,
+  the step Pro missed in all three (Q8), and commander step 6 once.
+- Q5 totals: Flash $0.84 for 24 sessions, Pro $4.84.
+
+What this shows. On these tasks Flash delivers what Pro delivers, at about
+a fifth of the cost per accepted result on single tasks and a fifth on
+dependent chains, taking a little longer per session. It is evidence for
+moving "agreed ordinary implementation" to Flash in Oathrun's table, with
+Pro kept for escalation; two repositories and small samples, so for these
+task classes only, and no frontier baseline was run.
