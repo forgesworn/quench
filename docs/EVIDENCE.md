@@ -1120,3 +1120,16 @@ output, with 1.82M of its 1.89M input read from the daemon's cache. Pro took
 125–359 seconds on the same task and the Flash pilot was rejected there.
 A separate 50K-token prompt showed the M4 reads uncached input at about
 185 tokens a second, with no truncation at its 262K context.
+
+## Q10 amendment 1: Qwen withdrawn after a thinking-off probe, 24 September 2026
+
+A second Qwen probe, with thinking off through a pass-through proxy (Ollama
+lets Qwen 3.8 think when Claude Code omits the parameter), was rejected on
+`orientation-commander` after 2,498 seconds: more turns (53) and more input
+(3.53M) than the thinking run, less output (15.4K). Per-turn latency at
+long context, not thinking, sets Qwen's pace on the M4, which serves one
+request at a time. Two probes, one accepted, about 40 minutes each, against
+Pro at about $0.20 and Flash at about $0.03 per accepted result: the lane
+is withdrawn before any counted session ([LANES.md](LANES.md), amendment
+1). Finding for Oathrun: its Qwen lane sends no thinking control, so on
+this Ollama build Qwen thinks by default.

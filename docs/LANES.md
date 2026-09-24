@@ -45,19 +45,19 @@ for these task classes only.
   endpoint, as in Q5 and Q8. Hosted models run on Ollama's cloud; the local
   model runs on the M4 through the host tunnel.
 - **Lanes:**
-  - `qwen3.8:latest` on the M4 (27.8B, nvfp4, loaded with its full 262K
-    context; no token charge). The M4 also serves a live agent, so one
-    session at a time. Its Q5 sessions run first, then its chains; the
-    owner may pause it, and it resumes where it stopped;
-  - `glm-5.3-flash:cloud`, once the owner approves its estimate;
+  - `qwen3.8:latest` on the M4: withdrawn before any counted session
+    (amendment 1 below);
+  - `glm-5.3-flash:cloud` (estimate approved by the owner);
   - `deepseek-v4.1-flash:cloud`, three fresh repetitions under the
     programme's DeepSeek approval (the Q5 and Q8 Flash pilots stay
     secondary and are not pooled);
   - the reference, `deepseek-v4-pro:cloud`, is not rerun: its Q5 plain arm
     (24 of 24 accepted) and Q8 carry runs (30 of 36 steps) are the
     comparison;
-  - a frontier baseline (Sonnet 5 or Opus 5) only with the owner's approval
-    of the estimate below.
+  - no frontier baseline: the owner chose, on 24 September 2026, not to run
+    Sonnet 5 (no API key here, and the subscription route raises the
+    automation question in Oathrun's provider-policy review). Lanes are
+    compared with Pro only, not with a frontier model.
 - **Repetitions and order:** three repetitions. Q5 tasks in the pack's task
   order; the chains alternate between repositories. Lanes may run at the
   same time only when they use different hosts.
@@ -103,7 +103,7 @@ $0.50 output; DeepSeek V4.1 Flash peak $0.30, $0.006, $1.20):
 | Qwen 3.8 (M4) | 24 Q5 + 6 chain runs | no token charge; about 15 hours of M4 time for the Q5 sessions and as much again for the chains |
 | GLM 5.3 Flash | 24 Q5 + 6 chain runs | about $2–4 |
 | DeepSeek V4.1 Flash | 24 Q5 + 6 chain runs | about $2.50 |
-| Sonnet 5 baseline (not approved) | 24 Q5 + 6 chain runs | about $50 at list price |
+| Sonnet 5 baseline (not run, owner's decision) | 24 Q5 + 6 chain runs | about $50 at list price |
 
 ## Probe (before the lock, not counted)
 
@@ -115,3 +115,28 @@ seconds. On the same task Pro took 125–359 seconds with 12–14K output (3 of
 output (thinking included) at about 21 tokens a second; a 50K-token prompt
 alone is read at about 185 tokens a second, so the cache holding across a
 session matters.
+
+## Amendment 1: the Qwen lane withdrawn, 24 September 2026
+
+Logged before any Qwen session was counted; the pass rules are unchanged.
+The first counted Qwen session was stopped by the operator a few minutes
+in and moved aside, not counted.
+
+A second probe ran Qwen with thinking off: Claude Code omits the thinking
+parameter for a custom endpoint, and Ollama's Qwen 3.8 then thinks by
+default, so a pass-through proxy (`runner/think-off-proxy.mjs`, sha256
+`8190ba5f6196bcfaafa81960e97d9b7a38ceda8a87af4daf553925ae8a3576e3`) set
+`thinking: disabled` on each request. On `orientation-commander` it was
+rejected, after 2,498 seconds, 53 turns, 3.53M input (3.45M cached) and
+15.4K output, with no thinking blocks. Thinking was not what made Qwen
+slow: each turn was, at long context, on a daemon that serves one request
+at a time. Qwen 3.8 has no cloud tag to run it faster.
+
+Over the two probes Qwen was accepted once in two, at about 40 minutes a
+session. On the same tasks at peak rates, Pro's 24 plain sessions cost
+about $4.85 (about $0.20 per accepted result, median 135 seconds) and Flash
+costs about $0.03 per accepted result so far. Qualifying Qwen would take
+about 30 hours of the M4, which also serves a live agent, to establish a
+saving of cents per task. The lane is withdrawn; a single screening
+repetition (8 sessions, about 5–6 hours) remains possible if the owner
+wants a capability figure.

@@ -19,6 +19,7 @@ export interface LaneSession {
 /** Published rates in US dollars per million tokens, read 24 September 2026 (peak where there are two). */
 export interface Rate { input: number; cached: number; output: number }
 export const RATES: Record<string, Rate> = {
+  'deepseek-v4-pro:cloud': { input: 1.32, cached: 0.044, output: 3.96 },
   'deepseek-v4.1-flash:cloud': { input: 0.3, cached: 0.006, output: 1.2 },
   'glm-5.3-flash:cloud': { input: 0.15, cached: 0.03, output: 0.5 },
   // Local: no token charge; its cost is M4 time, reported as seconds.
