@@ -159,6 +159,22 @@ before the counted run; the pass rules do not change.
    as the difference from the invocation before it, compaction calls
    included, which keeps the measure as defined above. Without the fix,
    step 1 of a chain would count six times over. The runner is unchanged.
+2. **The compaction call missed the cache (pilot, 24 September 2026).**
+   Steps ran with `--disable-slash-commands` (a Q5 flag) and the `/compact`
+   call could not, and the flag changes the prompt prefix. So the
+   compaction request, which Claude Code builds from the conversation's own
+   system prompt, tools and history to read them from the cache, missed
+   it. In a small test the compaction call wrote 9,769 tokens uncached with
+   the mismatch and 1,408 without it. In the pilot, the five compaction
+   calls per boundary run cost about 0.5M units, nearly all of boundary's
+   excess over carry. The runner now leaves the flag out of every
+   invocation, in every arm (`runner/chain.mjs` sha256
+   `b27a10c517c44c0978da1e26562aed80f4dbfbc954e8fa83d017a8c3fcae04ef`; the
+   locked file is kept beside it). The first Pro attempt, started with the
+   flag, was stopped during its first chain run and moved aside unscored.
+   A Flash check on commander (boundary and carry, one run each) confirmed
+   the fix: the five compaction calls wrote 7K tokens uncached and read
+   237K, costing 0.18M units against 0.49M before.
 
 ## Estimate (for the owner, before any run)
 

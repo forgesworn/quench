@@ -932,6 +932,18 @@ session, so the scorer now takes each invocation's own tokens.
 - **Rejections:** markdown-it step 4 under carry and under boundary, the
   same missing file in both, so compaction did not cause it.
 
+**Harness fault, found after this entry was written:** the boundary
+arm's compaction calls missed the cache because of a flag that differed
+between invocations (`docs/CHAINS.md`, harness fix 2). Those calls cost
+about 0.49M units on each chain, nearly all of boundary's excess. Without
+them, boundary's step calls cost 1.05 against carry's 1.18 on commander
+and 0.86 against 0.86 on markdown-it. The paragraph below is kept as
+written; its explanation of the excess is wrong. A Flash check with the
+fix (commander, one run each) still found boundary dearer than carry, 1.54
+against 1.22 (+26%): its compaction calls cost 0.18, and its step calls
+1.36 against 1.22, with 121 requests against 94. Single runs vary widely,
+so the counted run decides.
+
 What this shows. At these context sizes, compacting cost more than it
 saved. It cut raw tokens by a third but raised priced cost by 41%. After
 each compaction the next requests miss the cache and write the context
