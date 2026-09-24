@@ -83,11 +83,12 @@ const CLAUDE_PRICES = [
     [/fable-5|mythos-5/, 10, 0.1],
     [/opus-5-5/, 4, 0.05],
     [/opus-5|opus-4-[5-9]/, 5, 0.1],
-    [/opus-4|opus-3/, 15, 0.1],
+    [/opus-4|opus-3|3-opus/, 15, 0.1],
     [/sonnet-5/, 2, 0.1],
-    [/sonnet-4|sonnet-3-7/, 3, 0.1],
+    [/sonnet-4|sonnet-3-7|3-[57]-sonnet/, 3, 0.1],
     [/haiku-4-5/, 1, 0.1],
-    [/haiku-3-5/, 0.8, 0.1],
+    [/haiku-3-5|3-5-haiku/, 0.8, 0.1],
+    [/3-haiku/, 0.25, 0.1],
 ];
 const claudePrice = (model) => { const hit = CLAUDE_PRICES.find(([re]) => re.test(model)); return hit ? [hit[1], hit[2]] : null; };
 export const SONNET_5 = 'claude-sonnet-5';
@@ -115,6 +116,11 @@ const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const share = (x, total) => (total ? x / total : 0);
 export const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
 /**
+ * The break the guard acts on and the report sizes: more than an hour idle, so even a one-hour cache has
+ * expired, in a session of at least this much context.
+ */
+export const BREAK = { minContext: 300e3, minIdleMs: 3600e3 };
+/**
  * Requests that sent at least 50K of context, mostly uncached, more than an hour after the previous one: the
  * prompt cache had expired, so the whole context was written again. A session resumed then is a cheap point
  * to compact, because it pays for the context either way.
@@ -123,7 +129,7 @@ export function idleRebuilds(s) {
     return s.requests.filter((r, i) => {
         const prev = s.requests[i - 1];
         const uncached = r.write1h + r.write5m + r.fresh;
-        return i > 0 && prev?.at != null && r.at != null && r.at - prev.at > 3600e3 && r.ctx >= 50e3 && uncached >= 0.5 * r.ctx;
+        return i > 0 && prev?.at != null && r.at != null && r.at - prev.at > BREAK.minIdleMs && r.ctx >= 50e3 && uncached >= 0.5 * r.ctx;
     });
 }
 /** A drop of more than 40% from at least 100K, with `span` requests either side for the growth comparison. */
@@ -176,6 +182,11 @@ export function simulate(s, p, compactAt, summary) {
     }
     return modelled;
 }
+/**
+ * Subagents CLAUDE_CODE_SUBAGENT_MODEL can move: general-purpose ones, and transcripts without a type. Explore,
+ * Plan, forks, the other built-in agents and custom agents keep their own model.
+ */
+export const movedBySubagentModel = (s) => s.sub && (s.agentType === undefined || s.agentType === 'general-purpose');
 const LENGTHS = [[0, 30], [30, 100], [100, 300], [300, 1000], [1000, null]];
 const CONTEXTS = [[0, 50e3], [50e3, 100e3], [100e3, 200e3], [200e3, 400e3], [400e3, null]];
 export const WINDOWS = [800e3, 600e3, 400e3, 300e3, 200e3, 150e3, 100e3];
@@ -200,31 +211,37 @@ export function agentReport(agent, sessions, summaryOverride) {
         costShareAbove: share(sum(mainRequests.filter((r) => r.ctx >= window).map((r) => cost(r, p))), mainCost),
     })).filter((w) => w.costShareAbove >= 0.01 && w.window > summary);
     const byModel = new Map();
+    // Model names come from transcripts; one that is not a known vendor's could name anything, so it is not kept.
+    const shown = (id) => (/^(claude-|gpt|o\d|codex)[\w.:-]*$/.test(id) ? id : 'other');
     for (const r of all)
-        byModel.set(r.model, (byModel.get(r.model) ?? 0) + cost(r, p));
+        byModel.set(shown(r.model), (byModel.get(shown(r.model)) ?? 0) + cost(r, p));
     const thinkingCost = sum(all.map((r) => (p.scale(r.model) ?? 0) * p.out * r.think));
     const actions = [];
     // After a break longer than the cache lifetime the whole context is written again. For new work, a fresh
-    // session writes only the base prompt (the median first request of a session).
+    // session writes only the base prompt (the median first request of a session). Each rebuild is priced at the
+    // rates it was written at, less the base prompt's share, and never above what the request cost.
     const basePrompt = median(main.map((s) => s.requests[0]?.ctx ?? 0));
-    const breakSaving = sum(rebuilt.map((r) => (p.scale(r.model) ?? 0) * p.miss * Math.max(0, r.write1h + r.write5m + r.fresh - basePrompt)));
+    const breaks = rebuilt.filter((r) => r.ctx >= BREAK.minContext);
+    const breakSaving = sum(breaks.map((r) => {
+        const uncached = r.write1h + r.write5m + r.fresh;
+        const written = (p.scale(r.model) ?? 0) * (p.write1h * r.write1h + p.write5m * r.write5m + p.fresh * r.fresh);
+        return uncached ? Math.min(cost(r, p), (written * Math.max(0, uncached - basePrompt)) / uncached) : 0;
+    }));
     if (share(breakSaving, total) >= 0.01) {
-        actions.push({ id: 'fresh-after-break', saving: breakSaving, share: share(breakSaving, total), evidence: 'measured on your transcripts', facts: { breaks: rebuilt.length, medianContext: median(rebuilt.map((r) => r.ctx)), basePrompt } });
+        actions.push({ id: 'fresh-after-break', saving: breakSaving, share: share(breakSaving, total), evidence: 'breaks counted on your transcripts; the saving assumes each began new work', facts: { breaks: breaks.length, medianContext: median(breaks.map((r) => r.ctx)), basePrompt, minContext: BREAK.minContext } });
     }
     if (agent === 'claude') {
-        // Subagents on models dearer than Sonnet 5, priced again at Sonnet 5 with the same tokens.
-        const premium = subs.flatMap((s) => s.requests.map((r) => ({ r, type: s.agentType ?? 'unknown' }))).filter(({ r }) => cost(r, p) > costOn(r, p, SONNET_5));
-        const subSaving = sum(premium.map(({ r }) => cost(r, p) - costOn(r, p, SONNET_5)));
+        // Subagents on models dearer than Sonnet 5 that the setting can move, priced again at Sonnet 5 with the same
+        // tokens. Claude can still choose a stronger model for a call, so this is an upper bound.
+        const dearer = subs.flatMap((s) => s.requests.map((r) => ({ r, moved: movedBySubagentModel(s) }))).filter(({ r }) => cost(r, p) > costOn(r, p, SONNET_5));
+        const premium = dearer.filter((x) => x.moved).map((x) => x.r);
+        const subSaving = sum(premium.map((r) => cost(r, p) - costOn(r, p, SONNET_5)));
         if (share(subSaving, total) >= 0.01) {
-            const byType = new Map();
-            for (const { r, type } of premium)
-                byType.set(type, (byType.get(type) ?? 0) + cost(r, p));
-            const [topType, topCost] = [...byType].sort((a, b) => b[1] - a[1])[0] ?? ['unknown', 0];
-            actions.push({ id: 'subagent-model', saving: subSaving, share: share(subSaving, total), evidence: 'price arithmetic; quality not measured', facts: { premiumCost: sum(premium.map(({ r }) => cost(r, p))), premiumShare: share(sum(premium.map(({ r }) => cost(r, p))), total), topType, topTypeCost: topCost } });
+            const premiumCost = sum(premium.map((r) => cost(r, p)));
+            actions.push({ id: 'subagent-model', saving: subSaving, share: share(subSaving, total), evidence: 'price arithmetic; quality not measured', facts: { premiumCost, premiumShare: share(premiumCost, total), unmovedCost: sum(dearer.filter((x) => !x.moved).map((x) => cost(x.r, p))) } });
         }
     }
-    actions.push({ id: 'effort', saving: 0, share: share(thinkingCost, total), evidence: 'measured on your transcripts', facts: {} });
-    actions.push({ id: 'keep-window', saving: 0, share: 0, evidence: 'tested by Quench', facts: {} });
+    actions.push({ id: 'effort', saving: 0, share: share(thinkingCost, total), evidence: 'thinking share measured on your transcripts; the effect of effort on tool calls is not', facts: {} });
     actions.sort((a, b) => b.saving - a.saving);
     return {
         agent,
@@ -255,15 +272,18 @@ export function agentReport(agent, sessions, summaryOverride) {
         }),
         compactions: { count: drops.length, medianBefore: median(drops.map((d) => d.before)), medianAfter: median(drops.map((d) => d.after)), growthAfter: median(drops.map((d) => d.growth)) },
         idleRebuilds: { requests: rebuilt.length, costShare: share(sum(rebuilt.map((r) => cost(r, p))), mainCost), medianContext: median(rebuilt.map((r) => r.ctx)) },
-        simulation: { summary, summaryFrom: summaryOverride !== undefined ? 'set' : measured !== null ? 'your compactions' : 'default', windows },
+        simulation: { summary, summaryFrom: summaryOverride !== undefined ? 'set' : measured !== null ? 'your compactions' : 'default', windows, note: 'modelled upper bound, not calibrated; in the one live test (Q8, DeepSeek, contexts to 110K) a 100K window cost 3.6% more and accepted fewer steps' },
         actions,
     };
 }
-/** Share of all cost that went to subagents on models dearer than Sonnet 5, over requests logged in [from, to). */
+/**
+ * Share of all cost that went to subagents the setting can move, on models dearer than Sonnet 5, over requests
+ * logged in [from, to). It shows whether the setting took effect, not what it saved.
+ */
 export function premiumSubagentShare(sessions, from, to) {
     const p = pricing.claude;
     const inRange = (r) => r.at !== null && r.at >= from && r.at < to;
     const all = sessions.flatMap((s) => s.requests.filter(inRange));
-    const premium = sessions.filter((s) => s.sub).flatMap((s) => s.requests.filter(inRange)).filter((r) => cost(r, p) > costOn(r, p, SONNET_5));
+    const premium = sessions.filter(movedBySubagentModel).flatMap((s) => s.requests.filter(inRange)).filter((r) => cost(r, p) > costOn(r, p, SONNET_5));
     return { share: share(sum(premium.map((r) => cost(r, p))), sum(all.map((r) => cost(r, p)))), requests: all.length };
 }

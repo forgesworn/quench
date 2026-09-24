@@ -1,12 +1,12 @@
 {
   "name": "@forgesworn/quench",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "See where your coding agent's spend goes, and when a session should compact",
+  "description": "See where your coding agent's spend goes, and what you could change",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "bin": {
     "quench": "dist/cli.js",

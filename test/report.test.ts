@@ -8,11 +8,12 @@ import { agentReport, claudeParser, codexParser, cost, costOn, idleRebuilds, nat
 
 const MARKER = 'zq-private-marker'
 
-const claudeLine = (id: string, usage: Record<string, unknown>, model = 'claude-sonnet-5', text = `${MARKER} content`): string =>
-  JSON.stringify({ type: 'assistant', timestamp: '2026-09-23T10:00:00Z', cwd: `/home/${MARKER}/project`, message: { id, model, content: [{ type: 'text', text }], usage } })
-const codexLines = (sub: boolean, usages: Array<{ input: number; cached: number; output: number; total: number }>): string[] => [
+const YESTERDAY = new Date(Date.now() - 864e5).toISOString()
+const claudeLine = (id: string, usage: Record<string, unknown>, model = 'claude-sonnet-5', text = `${MARKER} content`, timestamp = YESTERDAY): string =>
+  JSON.stringify({ type: 'assistant', timestamp, cwd: `/home/${MARKER}/project`, message: { id, model, content: [{ type: 'text', text }], usage } })
+const codexLines = (sub: boolean, usages: Array<{ input: number; cached: number; output: number; total: number }>, model = 'gpt-5.6'): string[] => [
   JSON.stringify({ type: 'session_meta', payload: { cwd: `/home/${MARKER}`, source: sub ? { subagent: { thread_spawn: {} } } : 'cli' } }),
-  JSON.stringify({ type: 'turn_context', payload: { model: 'gpt-5.6', cwd: `/home/${MARKER}` } }),
+  JSON.stringify({ type: 'turn_context', payload: { model, cwd: `/home/${MARKER}` } }),
   JSON.stringify({ type: 'response_item', payload: { type: 'message', content: [{ type: 'input_text', text: MARKER }] } }),
   ...usages.map((u) => JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { total_tokens: u.total }, last_token_usage: { input_tokens: u.input, cached_input_tokens: u.cached, output_tokens: u.output, reasoning_output_tokens: 1 } } } })),
 ]
@@ -46,18 +47,37 @@ test('Claude requests are priced in dollars at each model\'s list price', () => 
   close(cost(req(1e6, 0, 1e6, 'claude-sonnet-5'), pricing.claude), 2 * 2 + 10)
   close(costOn(req(1e6, 0, 1e6, 'claude-opus-5'), pricing.claude, 'claude-sonnet-5'), 14)
   assert.equal(cost(req(1e6, 0, 1e6, 'claude-unknown-9'), pricing.claude), 0)
+  // Older ids put the version first.
+  close(cost(req(1e6, 1e6, 0, 'claude-3-5-haiku-20241022'), pricing.claude), 0.08)
+  close(cost(req(1e6, 1e6, 0, 'claude-3-7-sonnet-20250219'), pricing.claude), 0.3)
+  close(cost(req(1e6, 1e6, 0, 'claude-3-opus-20240229'), pricing.claude), 1.5)
 })
 
-test('actions: a fresh start after a break, subagents on Sonnet, and the two that save nothing', () => {
+test('actions: a fresh start after a break, general-purpose subagents on Sonnet, and effort', () => {
   const hour = 3600e3
   const main: Session = { agent: 'claude', sub: false, requests: [req(40e3, 0, 1, 'claude-opus-5', 0), req(300e3, 0, 1, 'claude-opus-5', 2 * hour)] }
-  const sub: Session = { agent: 'claude', sub: true, agentType: 'Explore', requests: [req(100e3, 0, 1e3, 'claude-opus-5', 0)] }
-  const report = agentReport('claude', [main, sub])
-  assert.deepEqual(report.actions.map((a) => a.id), ['fresh-after-break', 'subagent-model', 'effort', 'keep-window'])
+  const general: Session = { agent: 'claude', sub: true, agentType: 'general-purpose', requests: [req(100e3, 0, 1e3, 'claude-opus-5', 0)] }
+  const explore: Session = { agent: 'claude', sub: true, agentType: 'Explore', requests: [req(100e3, 0, 1e3, 'claude-opus-5', 0)] }
+  const report = agentReport('claude', [main, general, explore])
+  assert.deepEqual(report.actions.map((a) => a.id), ['fresh-after-break', 'subagent-model', 'effort'])
   const fresh = report.actions[0]!
-  // 300K written again at 2x, less the 40K base prompt, at $5 per million.
+  // 300K written again at the one-hour rate, less the 40K base prompt, at $5 per million.
   assert.ok(Math.abs(fresh.saving - 2 * (300e3 - 40e3) * 5e-6) < 1e-9)
-  assert.equal(report.actions[1]?.facts.topType, 'Explore')
+  // The setting cannot move Explore, so only the general-purpose agent counts.
+  const sub = report.actions[1]!
+  assert.ok(Math.abs(sub.saving - (cost(general.requests[0]!, pricing.claude) - costOn(general.requests[0]!, pricing.claude, 'claude-sonnet-5'))) < 1e-9)
+  assert.equal(sub.facts.unmovedCost, cost(explore.requests[0]!, pricing.claude))
+  // Only an Explore agent on Opus: nothing to suggest.
+  assert.deepEqual(agentReport('claude', [main, explore]).actions.map((a) => a.id), ['fresh-after-break', 'effort'])
+})
+
+test('a break priced at the five-minute rate never saves more than the request cost', () => {
+  const hour = 3600e3
+  const five = (ctx: number, at: number): Request => ({ model: 'claude-opus-5', ctx, read: 0, write1h: 0, write5m: ctx, fresh: 0, out: 1, think: 0, at })
+  const s: Session = { agent: 'claude', sub: false, requests: [five(10e3, 0), five(400e3, 2 * hour)] }
+  const a = agentReport('claude', [s]).actions.find((x) => x.id === 'fresh-after-break')!
+  assert.ok(Math.abs(a.saving - 1.25 * (400e3 - 10e3) * 5e-6) < 1e-9)
+  assert.ok(a.saving <= cost(s.requests[1]!, pricing.claude))
 })
 
 test('compacting at a window cuts modelled cost of a growing session, and a window above it changes nothing', () => {
@@ -101,13 +121,26 @@ test('the report prints no transcript content, project names or paths', () => {
   writeFileSync(join(claudeRoot, `-home-${MARKER}-project`, MARKER, 'subagents', 'agent-a.meta.json'), JSON.stringify({ agentType: `${MARKER}-agent`, description: MARKER }))
   const usages = Array.from({ length: 80 }, (_, i) => ({ input: 50e3 + i * 5e3, cached: 45e3 + i * 5e3, output: 300, total: (i + 1) * 1e6 }))
   writeFileSync(join(codexRoot, '2026', '09', '23', `rollout-${MARKER}.jsonl`), `${codexLines(false, usages).join('\n')}\n`)
+  // A model name that is not a known vendor's could name a project, so it is not printed.
+  writeFileSync(join(codexRoot, '2026', '09', '23', `rollout-${MARKER}-2.jsonl`), `${codexLines(false, usages, `${MARKER}-model`).join('\n')}\n`)
   for (const extra of [[], ['--json']]) {
     const run = spawnSync(process.execPath, ['src/cli-report.ts', '--claude-root', claudeRoot, '--codex-root', codexRoot, ...extra], { encoding: 'utf8' })
     assert.equal(run.status, 0, run.stderr)
-    assert.match(run.stdout, extra.length ? /"agent": "codex"/ : /Codex: 1 session, 0 subagent transcripts/)
+    assert.match(run.stdout, extra.length ? /"agent": "codex"/ : /Codex: 2 sessions, 0 subagent transcripts/)
     assert.match(run.stdout, extra.length ? /"otherModelRequests": 1/ : /Claude Code: 1 session, 1 subagent transcript, 84 requests/)
     for (const secret of [MARKER, dir, 'home']) assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false, `output contains ${secret}`)
   }
+})
+
+test('--days leaves out requests older than the window, even in a recent file', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'quench-days-'))
+  mkdirSync(join(dir, 'p'), { recursive: true })
+  const old = new Date(Date.now() - 90 * 864e5).toISOString()
+  const lines = [...Array.from({ length: 50 }, (_, i) => claudeLine(`o${i}`, { input_tokens: 1, output_tokens: 1 }, 'claude-haiku-4-5', 'x', old)), claudeLine('new', { input_tokens: 1, output_tokens: 1 })]
+  writeFileSync(join(dir, 'p', 's.jsonl'), `${lines.join('\n')}\n`)
+  const run = spawnSync(process.execPath, ['src/cli-report.ts', '--claude-root', dir, '--codex-root', join(dir, 'none'), '--days', '7'], { encoding: 'utf8' })
+  assert.equal(run.status, 0, run.stderr)
+  assert.match(run.stdout, /1 session, 0 subagent transcripts, 1 request\b/)
 })
 
 test('the published build runs without type stripping', () => {

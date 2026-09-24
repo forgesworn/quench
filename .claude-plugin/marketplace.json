@@ -4,13 +4,13 @@
     "name": "TheCryptoDonkey"
   },
   "metadata": {
-    "description": "Quench: find what your coding agent spends money on, and change it."
+    "description": "Quench: see where your coding agent's spend goes, and what you could change."
   },
   "plugins": [
     {
       "name": "quench",
       "source": "./plugin",
-      "description": "See where your Claude Code and Codex spend goes, apply the changes that save the most, and get a warning before a break costs you a full context rewrite."
+      "description": "See where your Claude Code and Codex spend goes, ranked by what you could change, with an optional guard that holds the first prompt after a long break."
     }
   ]
 }

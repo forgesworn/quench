@@ -1,10 +1,12 @@
 // Apply and undo report actions that are Claude Code settings. Every change is shown before it is written, backed
-// up, and recorded with its date so the report can compare spend before and after.
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+// up, and recorded with exactly what was written, so undo removes only that and the report can date the change.
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, sep } from 'node:path';
 export const quenchHome = () => process.env.QUENCH_HOME ?? join(homedir(), '.quench');
-export const claudeSettingsPath = () => process.env.QUENCH_CLAUDE_SETTINGS ?? join(homedir(), '.claude', 'settings.json');
+/** Claude Code's own directory, which CLAUDE_CONFIG_DIR moves. */
+export const claudeHome = () => process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude');
+export const claudeSettingsPath = () => process.env.QUENCH_CLAUDE_SETTINGS ?? join(claudeHome(), 'settings.json');
 export function readState() {
     try {
         return JSON.parse(readFileSync(join(quenchHome(), 'state.json'), 'utf8'));
@@ -17,103 +19,166 @@ function writeState(state) {
     mkdirSync(quenchHome(), { recursive: true });
     writeFileSync(join(quenchHome(), 'state.json'), `${JSON.stringify(state, null, 2)}\n`);
 }
-function readSettings(path) {
+export function readSettings(path) {
     if (!existsSync(path))
         return {};
-    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    let parsed;
+    // The parser's message quotes the file, which can hold API keys, so it is never passed on.
+    try {
+        parsed = JSON.parse(readFileSync(path, 'utf8'));
+    }
+    catch {
+        throw new Error(`${path} is not valid JSON; nothing was changed`);
+    }
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
         throw new Error(`${path} is not a JSON object; nothing was changed`);
     return parsed;
 }
+const BACKUPS_KEPT = 3;
+/** Backs up the file beside itself, keeping the newest few, then replaces it atomically with the same mode. */
 function writeSettings(path, settings) {
+    const target = existsSync(path) ? realpathSync(path) : path;
+    mkdirSync(dirname(target), { recursive: true });
+    const mode = existsSync(target) ? statSync(target).mode & 0o777 : 0o600;
     let backup = null;
-    if (existsSync(path)) {
-        backup = `${path}.quench-backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-        copyFileSync(path, backup);
+    if (existsSync(target)) {
+        backup = `${target}.quench-backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        copyFileSync(target, backup);
+        chmodSync(backup, mode);
+        const prefix = `${basename(target)}.quench-backup-`;
+        const old = readdirSync(dirname(target)).filter((f) => f.startsWith(prefix)).sort().slice(0, -BACKUPS_KEPT);
+        for (const f of old)
+            rmSync(join(dirname(target), f), { force: true });
     }
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+    const temporary = `${target}.quench-${process.pid}`;
+    writeFileSync(temporary, `${JSON.stringify(settings, null, 2)}\n`, { mode });
+    renameSync(temporary, target);
     return backup;
 }
-const env = (s) => {
-    if (typeof s.env !== 'object' || s.env === null)
+export const ACTIONS = ['subagent-model', 'break-guard'];
+const known = (action) => { if (!ACTIONS.includes(action))
+    throw new Error(`unknown action ${action}; one of ${ACTIONS.join(', ')}`); };
+const SUBAGENT_MODEL = 'sonnet';
+const envOf = (s) => {
+    if (typeof s.env !== 'object' || s.env === null || Array.isArray(s.env))
         s.env = {};
     return s.env;
 };
-// A Quench guard entry: its command runs a Quench CLI with the guard subcommand.
-const isGuard = (entry) => (entry?.hooks ?? [])
-    .some((h) => typeof h.command === 'string' && /(quench|cli\.[jt]s)"? guard$/.test(h.command));
-export const SETTING_ACTIONS = {
-    'subagent-model': {
-        describe: 'set env.CLAUDE_CODE_SUBAGENT_MODEL to "sonnet": subagents with no model of their own run on Sonnet 5; Claude can still ask for a stronger one, and Explore and Plan are unchanged',
-        read: (s) => s.env?.CLAUDE_CODE_SUBAGENT_MODEL,
-        set: (s, v) => { const e = env(s); if (v === undefined)
-            delete e.CLAUDE_CODE_SUBAGENT_MODEL;
-        else
-            e.CLAUDE_CODE_SUBAGENT_MODEL = v; if (!Object.keys(e).length)
-            delete s.env; },
-        value: () => 'sonnet',
-        applied: (current, wanted) => current === wanted,
-    },
-    'break-guard': {
-        describe: 'add a UserPromptSubmit hook, "quench guard": after a break longer than the prompt cache lasts, the first prompt to a large session is held once with what sending it will cost',
-        read: (s) => s.hooks?.UserPromptSubmit?.find(isGuard),
-        set: (s, v) => {
-            if (typeof s.hooks !== 'object' || s.hooks === null)
-                s.hooks = {};
-            const hooks = s.hooks;
-            const list = (hooks.UserPromptSubmit ?? []).filter((entry) => !isGuard(entry));
-            if (v !== undefined)
-                list.push(v);
-            if (list.length)
-                hooks.UserPromptSubmit = list;
-            else
-                delete hooks.UserPromptSubmit;
-            if (!Object.keys(hooks).length)
-                delete s.hooks;
-        },
-        value: (command) => ({ hooks: [{ type: 'command', command, timeout: 10 }] }),
-        applied: (current) => current !== undefined,
-    },
+const promptHooks = (s) => {
+    const list = s.hooks?.UserPromptSubmit;
+    return Array.isArray(list) ? list : [];
 };
-/** The command a hook runs to reach this Quench: the running Node and CLI, so it works without a global install. */
+const hasCommand = (s, command) => promptHooks(s).some((e) => (e.hooks ?? []).some((h) => h.command === command));
+/** Removes the hook objects running `command`, and an entry only if nothing else is left in it. */
+function removeCommand(s, command) {
+    const hooks = s.hooks;
+    const list = [];
+    for (const e of promptHooks(s)) {
+        if (!(e.hooks ?? []).some((h) => h.command === command)) {
+            list.push(e);
+            continue;
+        }
+        const rest = (e.hooks ?? []).filter((h) => h.command !== command);
+        if (rest.length)
+            list.push({ ...e, hooks: rest });
+    }
+    if (list.length)
+        hooks.UserPromptSubmit = list;
+    else
+        delete hooks.UserPromptSubmit;
+    if (!Object.keys(hooks).length)
+        delete s.hooks;
+}
+/** Whether the Quench plugin is enabled in these settings, and whether its break guard is switched on. */
+export function pluginState(settings) {
+    const enabled = Object.entries(settings.enabledPlugins ?? {}).some(([id, on]) => id.startsWith('quench@') && on === true);
+    const configs = settings.pluginConfigs ?? {};
+    const guard = Object.entries(configs).some(([id, c]) => id.startsWith('quench@') && c?.options?.break_guard === true);
+    return { enabled, guard: enabled && guard };
+}
+/** The command a settings hook runs to reach this Quench: the running Node and CLI, so no global install is needed. */
 export const guardCommand = (cli) => `"${process.execPath}" "${cli}" guard`;
+const insidePlugin = (cli) => Boolean(process.env.CLAUDE_PLUGIN_ROOT) || cli.includes(`${sep}plugins${sep}cache${sep}`);
+const PLUGIN_GUARD = 'the Quench plugin runs the break guard itself; turn it on with break_guard under the plugin in /config';
 export function apply(action, write, cli) {
-    const spec = SETTING_ACTIONS[action];
-    if (!spec)
-        throw new Error(`unknown action ${action}; one of ${Object.keys(SETTING_ACTIONS).join(', ')}`);
+    known(action);
     const path = claudeSettingsPath();
     const settings = readSettings(path);
-    const current = spec.read(settings);
-    const wanted = spec.value(guardCommand(cli));
-    if (spec.applied(current, wanted))
-        return { action, path, describe: spec.describe, skip: 'already in place' };
-    if (current !== undefined && action === 'subagent-model')
-        return { action, path, describe: spec.describe, skip: `CLAUDE_CODE_SUBAGENT_MODEL is already set to ${JSON.stringify(current)}; change it yourself if you want Sonnet` };
-    if (write) {
-        spec.set(settings, wanted);
-        writeSettings(path, settings);
-        const state = readState();
-        state.applied[action] = { at: new Date().toISOString(), settings: path, ...(current !== undefined ? { previous: current } : {}) };
+    const state = readState();
+    if (action === 'subagent-model') {
+        const describe = `set env.CLAUDE_CODE_SUBAGENT_MODEL to "${SUBAGENT_MODEL}": general-purpose subagents with no model of their own run on Sonnet; Claude can still ask for a stronger one, and Explore, Plan and agents with their own model are unchanged`;
+        const current = settings.env?.CLAUDE_CODE_SUBAGENT_MODEL;
+        if (current === SUBAGENT_MODEL)
+            return { action, path, describe, skip: 'already in place' };
+        if (current !== undefined)
+            return { action, path, describe, skip: `CLAUDE_CODE_SUBAGENT_MODEL is already set to ${JSON.stringify(current)}; change it yourself if you want Sonnet` };
+        const note = 'Claude Code sessions started from now on use it. Project or managed settings that set the same variable take precedence.';
+        if (!write)
+            return { action, path, describe, skip: null, note };
+        envOf(settings).CLAUDE_CODE_SUBAGENT_MODEL = SUBAGENT_MODEL;
+        const backup = writeSettings(path, settings);
+        state.applied[action] = { at: new Date().toISOString(), settings: path, wrote: SUBAGENT_MODEL };
         writeState(state);
+        return { action, path, describe, skip: null, backup, note };
     }
-    return { action, path, describe: spec.describe, skip: null };
+    const command = guardCommand(cli);
+    const describe = `add a UserPromptSubmit hook running ${command}: after a break of over an hour, the first prompt to a large session is held once with what sending it will cost`;
+    // A plugin copy of the CLI moves on every update, and two guards would each undo the other's mark.
+    if (insidePlugin(cli) || pluginState(settings).enabled)
+        return { action, path, describe, skip: PLUGIN_GUARD };
+    if (hasCommand(settings, command))
+        return { action, path, describe, skip: 'already in place' };
+    const existing = settings.hooks?.UserPromptSubmit;
+    if (existing !== undefined && !Array.isArray(existing))
+        return { action, path, describe, skip: 'hooks.UserPromptSubmit in the settings file is not a list; nothing was changed' };
+    const note = 'The hook runs this Node and this copy of Quench by path: if you move either, run apply again. Claude Code picks up hook changes straight away.';
+    if (!write)
+        return { action, path, describe, skip: null, note };
+    const earlier = state.applied[action]?.wrote;
+    if (typeof earlier === 'string' && hasCommand(settings, earlier))
+        removeCommand(settings, earlier);
+    if (typeof settings.hooks !== 'object' || settings.hooks === null || Array.isArray(settings.hooks))
+        settings.hooks = {};
+    settings.hooks.UserPromptSubmit = [...promptHooks(settings), { hooks: [{ type: 'command', command, timeout: 10 }] }];
+    const backup = writeSettings(path, settings);
+    state.applied[action] = { at: new Date().toISOString(), settings: path, wrote: command };
+    writeState(state);
+    return { action, path, describe, skip: null, backup, note };
 }
 export function undo(action, write) {
-    const spec = SETTING_ACTIONS[action];
-    if (!spec)
-        throw new Error(`unknown action ${action}; one of ${Object.keys(SETTING_ACTIONS).join(', ')}`);
+    known(action);
     const state = readState();
     const record = state.applied[action];
     const path = record?.settings ?? claudeSettingsPath();
+    const describe = action === 'subagent-model'
+        ? `put env.CLAUDE_CODE_SUBAGENT_MODEL back to ${record?.previous === undefined ? 'unset' : JSON.stringify(record.previous)}`
+        : 'remove the break-guard hook Quench added';
+    if (!record)
+        return { action, path, describe, skip: 'Quench has no record of applying this, so it changes nothing' };
     const settings = readSettings(path);
-    if (spec.read(settings) === undefined)
-        return { action, path, describe: spec.describe, skip: 'not in place' };
-    if (write) {
-        spec.set(settings, record?.previous);
-        writeSettings(path, settings);
-        delete state.applied[action];
-        writeState(state);
+    if (action === 'subagent-model') {
+        const current = settings.env?.CLAUDE_CODE_SUBAGENT_MODEL;
+        if (current !== record.wrote)
+            return { action, path, describe, skip: `CLAUDE_CODE_SUBAGENT_MODEL has changed since Quench set it (now ${current === undefined ? 'unset' : JSON.stringify(current)}); left as it is` };
+        if (!write)
+            return { action, path, describe, skip: null };
+        const env = envOf(settings);
+        if (record.previous === undefined)
+            delete env.CLAUDE_CODE_SUBAGENT_MODEL;
+        else
+            env.CLAUDE_CODE_SUBAGENT_MODEL = record.previous;
+        if (!Object.keys(env).length)
+            delete settings.env;
     }
-    return { action, path, describe: spec.describe, skip: null };
+    else {
+        if (typeof record.wrote !== 'string' || !hasCommand(settings, record.wrote))
+            return { action, path, describe, skip: 'the hook Quench added is no longer there' };
+        if (!write)
+            return { action, path, describe, skip: null };
+        removeCommand(settings, record.wrote);
+    }
+    const backup = writeSettings(path, settings);
+    delete state.applied[action];
+    writeState(state);
+    return { action, path, describe, skip: null, backup };
 }
