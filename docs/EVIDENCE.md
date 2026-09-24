@@ -909,3 +909,37 @@ what compacting costs in accepted work.
   uncompacted. A small auto-compact window with a hook that lets a
   compaction through only at a boundary is therefore a way to deliver a
   boundary trigger (GOALS Q9).
+
+## Q8 Flash pilot (secondary), 24 September 2026
+
+Secondary evidence only: `deepseek-v4.1-flash:cloud`, one repetition, both
+chains under all three policies, protocol locked at `e99c152`. Six of six
+runs completed and none was rerun. One harness fault was found and fixed
+before scoring (`6f8644d`): `modelUsage` is a running total over a resumed
+session, so the scorer now takes each invocation's own tokens.
+
+| Policy | Accepted | Priced (M units) | Raw tokens | Cache misses | Cache reads | Output | Compactions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| carry | 11/12 | 2.05 | 10.40M | 0.21M | 10.19M | 0.12M | 0 |
+| threshold (100K) | 12/12 | 2.45 (+20%) | 9.77M | 0.29M | 9.48M | 0.18M | 4 |
+| boundary | 11/12 | 2.89 (+41%) | 6.68M | 0.67M | 6.01M | 0.19M | 10 |
+
+- **Per chain:** commander carry 1.18, threshold 1.36, boundary 1.55;
+  markdown-it carry 0.86, threshold 1.09, boundary 1.34.
+- **Context:** carry peaked at 111K (commander) and 79K (markdown-it).
+  Boundary compactions went from 21–60K down to 6–16K. The 100K window
+  compacted automatically at 68–72K, twice per chain.
+- **Rejections:** markdown-it step 4 under carry and under boundary, the
+  same missing file in both, so compaction did not cause it.
+
+What this shows. At these context sizes, compacting cost more than it
+saved. It cut raw tokens by a third but raised priced cost by 41%. After
+each compaction the next requests miss the cache and write the context
+again at 2×, and the summary is output at 5×. That outweighs 4.2M fewer
+cache reads at 0.1×. A compaction pays only when enough later requests
+each read a much smaller context. These chains peak near 110K, and each
+step is 6–45 turns. Most of the owner's cost sits above 200K in sessions
+of hundreds of requests, which these chains do not reach. The counted Pro
+run goes ahead as locked. The modelled savings in `quench report` leave
+out the tax of reading again after a compaction, and they need
+calibrating against these runs before anyone relies on them.
