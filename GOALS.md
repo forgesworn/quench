@@ -273,12 +273,84 @@ boundary and should compact. Deliver it where it can act:
 setting on fresh chains under a locked protocol, and meets the latency
 budgets above.
 
+### Q10: Measure which cheaper models deliver, for Oathrun's routing
+
+Oathrun's routing policy runs ordinary work on the cheapest suitable lane
+(local Qwen 3.8, then hosted DeepSeek Flash or GLM, then DeepSeek Pro) and
+keeps frontier models for design and consequential review. Its own goals
+call the model-selection table "a starting guess" until a bake-off measures
+it on real tasks (Oathrun `docs/MODEL-ROUTING-GOALS.md`, G3b), and its
+lane records so far prove that each lane runs, not how often it delivers.
+Quench has locked tasks with deterministic checkers and a harness that
+changes nothing but the model.
+
+Question: on those tasks, how often does each cheaper model deliver an
+accepted result, at what cost and wall time, next to DeepSeek V4 Pro?
+
+- **Tasks:** the Q5 held-out pack (orientation, diagnosis, impact and code
+  change, on commander.js and markdown-it), plain arm, and the Q8 chains
+  under carry. The runner, flags and checkers stay as locked; only
+  `--executor-model` changes.
+- **Lanes:** `qwen3.8:latest` on the M4 (no token charge, shared with a
+  live agent, so one session at a time), `glm-5.3-flash:cloud` and
+  `deepseek-v4.1-flash:cloud`, against the Q5 and Q8 Pro recordings. A
+  frontier baseline (Sonnet 5 or Opus 5) is Claude spend and needs the
+  owner's approval of an estimate.
+- **Measures:** accepted results per task class; cost per accepted result
+  including failed attempts, at each lane's own tariff with the rate's date
+  (local: no token charge, M4 wall time reported); wall time; turn-limit
+  stops and tool errors.
+- **Pass rule, per lane and task class:** the lane qualifies for the class
+  when it is accepted at least as often as Pro, less one session, over the
+  same repetitions. Locked with everything else in a protocol file before
+  the first counted session.
+- **Limits:** the harness is Claude Code on Ollama's documented
+  Anthropic-compatible endpoint, the route Q5 and Q8 used for the owner's
+  own research. It measures model capability on these tasks, not an
+  Oathrun lane or journey, and Oathrun's provider-policy review still
+  governs Oathrun's use. Two repositories and small samples: evidence for
+  these task classes only.
+
+**Done when:** the protocol is locked, the runs are recorded, and the
+result is written up per lane and task class with its spread, plus a short
+record the Oathrun owner can file with that project's evidence.
+
+### Q11: An escalation trigger for a cheaper lane
+
+Oathrun may escalate "after the configured number of completed attempts
+with no new evidence" (Oathrun `docs/PHASED-MODEL-ROUTING.md`). Can a
+decider tell within one attempt, from what exists at run time, that a
+cheaper lane is failing, so the host hands the task to a stronger lane
+before the attempt spends the rest of its budget?
+
+The stop decider failed because a wrong stop throws away work (Q5, Q6). A
+wrong escalation costs one stronger attempt and keeps the work, and the
+host enforces it, so the model is never asked to comply.
+
+- **Data:** the cheaper-lane sessions from Q10, with the Q5 and Q8 Flash
+  and Pro sessions. The label is the checker's verdict on the session.
+- **Signals, deterministic first:** the decision points since a new file
+  or result appeared (`stale-N`), repeated identical tool errors, the same
+  command run again, repeated failing tests, turns used.
+- **Rule:** thresholds fixed on a development split and locked before the
+  held-out split is scored; the leakage test extends to the verdict.
+- **Pass:** on held-out cheaper-lane sessions, the trigger fires before the
+  end in at least half of the rejected sessions, leaving at least 30% of
+  their input unspent, and in at most 10% of the accepted ones.
+
+**Done when:** the rule is locked before scoring, scored as above within
+the latency budgets, and written up with whether Oathrun should consume it
+as a typed, host-checkable fact. With fewer than ten rejected cheaper-lane
+sessions, Q11 reports that and waits for more.
+
 ## Order and handoff
 
 Q0, Q1, Q2 in order, then Q3 only if needed. Q4 can start once Q1 exists. Q5
 can be prepared alongside Q2 by a separate session. Q6 waits for Q5 and a
 passing offline decider. Q7's report can ship before Q8 ends; its
-compaction policy waits for Q8, and Q9 waits for Q8's rules 1 and 2. Each
+compaction policy waits for Q8, and Q9 waits for Q8's rules 1 and 2. Q10
+starts with a probe of each new lane on one task; Q11 waits for Q10's
+recordings. Each
 handoff names the goal, starting commit, allowed files, model and effort,
 and acceptance checks. The receiver returns the diff, checks and evidence
 entry.

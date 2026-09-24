@@ -1105,3 +1105,18 @@ list prices; general-purpose subagents on Sonnet 5, up to $1,456 (12%),
 with a further $354 on subagents the setting does not move; 89 breaks in
 sessions of 300K+ (median 455K), up to $523 (4%) if each began new work.
 These replace the Q7 actions figures above.
+
+## Q10: lane protocol locked, after a Qwen probe, 24 September 2026
+
+[`docs/LANES.md`](LANES.md) is locked by this commit, before the first
+counted session: the Q5 held-out tasks (plain arm) and the Q8 chains
+(carry), unchanged, with only the executor model varied, against the Pro
+recordings. Lanes: `qwen3.8:latest` on the M4, `glm-5.3-flash:cloud` (once
+its estimate is approved) and `deepseek-v4.1-flash:cloud`.
+
+The probe before the lock (not counted): `qwen3.8:latest` on
+`orientation-commander` was accepted in 2,213 seconds, 46 turns, 37.8K
+output, with 1.82M of its 1.89M input read from the daemon's cache. Pro took
+125–359 seconds on the same task and the Flash pilot was rejected there.
+A separate 50K-token prompt showed the M4 reads uncached input at about
+185 tokens a second, with no truncation at its 262K context.
