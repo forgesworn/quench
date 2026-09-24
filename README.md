@@ -9,8 +9,10 @@ point, stop gathering evidence or call another tool? Measured on held-out
 tasks and live sessions, a stop saves little. Agents already stop gathering
 near the right point, and they ignore a hint to stop
 ([evidence](docs/EVIDENCE.md), Q5 and Q6). The cost is elsewhere: in long
-sessions that resend very large contexts. Quench now measures that cost and
-is testing when a session should compact ([GOALS](GOALS.md), Q7 to Q9).
+sessions that resend very large contexts. Quench now measures that cost.
+It also tested compacting at task boundaries (Q8): in sessions up to about
+110K of context, that cost 16% more and lost accepted steps, so no
+compaction policy is recommended. Sessions above 200K were not tested.
 
 Private and experimental. No saving is claimed until the benchmark has
 measured it.
@@ -43,8 +45,9 @@ What it does not do:
   cached input 0.1×, output 8×.
 - The compaction figures are an upper bound. They assume the agent works
   as well after compacting, and the model leaves out cache expiries (it is
-  compared with the same model of the session as recorded). Whether the
-  agent does work as well is what Q8 measures ([protocol](docs/CHAINS.md)).
+  compared with the same model of the session as recorded). In Q8 the
+  agent did not work as well after compacting, in sessions up to about
+  110K ([protocol](docs/CHAINS.md), [verdict](docs/EVIDENCE.md)).
 - Transcripts are chosen by file modification time.
 
 ## Research: the stop decider

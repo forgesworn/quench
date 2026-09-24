@@ -97,9 +97,10 @@ if (args.includes('--json')) {
     if (r.simulation.windows.length) {
       out(`  Compacting earlier, modelled with a ${k(r.simulation.summary)} context after each compaction (${r.simulation.summaryFrom === 'your compactions' ? 'the median after your compactions' : r.simulation.summaryFrom === 'set' ? 'set by --summary' : 'a default'}):`)
       for (const w of r.simulation.windows) out(`    at ${k(w.window).padEnd(6)} ${`${(100 * w.costChange).toFixed(0)}%`.padStart(5)} cost (${pct(w.costShareAbove)} of cost is sent above this size)`)
-      out('    An upper bound: it assumes the agent works as well after compacting. Whether it does is what')
-      out('    Quench measures (docs/CHAINS.md); no saving is claimed until that result is in.')
-      out(`  Setting: ${setting[r.agent]}.`)
+      out('    An upper bound: it assumes the agent works as well after compacting. In Quench\'s benchmark')
+      out('    (sessions up to about 110K) it did not: compacting at task boundaries cost 16% more and lost')
+      out('    accepted steps. Sessions above 200K were not tested. No saving is claimed.')
+      out(`  The window is set with ${setting[r.agent]}.`)
     }
   }
 }
