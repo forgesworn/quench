@@ -26,23 +26,31 @@ node src/cli-report.ts --json
 ```
 
 It reads the transcripts Claude Code (`~/.claude/projects`) and Codex
-(`~/.codex/sessions`) keep on your machine and prints where the cost went:
+(`~/.codex/sessions`) keep on your machine, and prints:
 
-- cache reads, cache writes and fresh input, output, and the subagents'
-  share;
-- cost by session length and by the size of the context each request sent;
-- the compactions your sessions already made;
-- what compacting at a smaller window would have cost, modelled request by
-  request, with the setting that controls it.
+- **Actions**, ranked by what they would save, each sized from your own
+  transcripts and labelled by how far it is known to hold (measured on
+  your transcripts, tested by Quench, or price arithmetic only). For
+  example: run subagents on Sonnet 5 unless the task needs more; start new
+  work in a fresh session after a break longer than the prompt cache
+  lasts; do not lower effort or shrink the compaction window to save money.
+- where the cost went: cache reads, writes and output, subagents, models,
+  session length and the context size each request sent;
+- the compactions your sessions already made, and what compacting at a
+  smaller window would have cost, modelled request by request.
 
 What it does not do:
 
 - It prints aggregates only: no transcript content, project names or paths,
   and nothing leaves the machine. A test checks this.
-- It prices tokens with multipliers, not money. Claude Code: cache read
-  0.1× (Opus 5.5 0.05×, Fable and Mythos 0.025×), one-hour cache write 2×,
-  five-minute 1.25×, output 5×. Codex (assumed, from GPT-5 list prices):
-  cached input 0.1×, output 8×.
+- Claude Code is priced at Anthropic's API list prices per model (read 24
+  September 2026). A subscription pays a flat fee, but its limits follow
+  the same token costs. Codex is reported in base-input units with assumed
+  multipliers (cached input 0.1×, output 8×), since no price is known for
+  its models.
+- A suggested saving assumes the same tokens: switching a subagent's model
+  or starting fresh may change how much work the agent does, and the
+  quality of a model switch is not measured.
 - The compaction figures are an upper bound. They assume the agent works
   as well after compacting, and the model leaves out cache expiries (it is
   compared with the same model of the session as recorded). In Q8 the

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { agentReport, claudeParser, codexParser, cost, idleRebuilds, naturalCompactions, pricing, simulate, type Request, type Session } from '../src/report.ts'
+import { agentReport, claudeParser, codexParser, cost, costOn, idleRebuilds, naturalCompactions, pricing, simulate, type Request, type Session } from '../src/report.ts'
 
 const MARKER = 'zq-private-marker'
 
@@ -38,10 +38,26 @@ test('Codex parser skips repeated counts and reads cached tokens inside input', 
 
 const req = (ctx: number, read: number, out = 100, model = 'claude-sonnet-5', at: number | null = null): Request => ({ model, ctx, read, write1h: ctx - read, write5m: 0, fresh: 0, out, think: 0, at })
 
-test('pricing weights cache reads by model', () => {
-  assert.equal(cost(req(1000, 1000, 0, 'claude-opus-5-5'), pricing.claude), 50)
-  assert.equal(cost(req(1000, 1000, 0, 'claude-fable-5-1'), pricing.claude), 25)
-  assert.equal(cost(req(1000, 0, 10), pricing.claude), 2050)
+test('Claude requests are priced in dollars at each model\'s list price', () => {
+  const close = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-12, `${a} != ${b}`)
+  close(cost(req(1e6, 1e6, 0, 'claude-opus-5-5'), pricing.claude), 0.2)
+  close(cost(req(1e6, 1e6, 0, 'claude-fable-5-1'), pricing.claude), 0.25)
+  close(cost(req(1e6, 1e6, 0, 'claude-fable-5'), pricing.claude), 1)
+  close(cost(req(1e6, 0, 1e6, 'claude-sonnet-5'), pricing.claude), 2 * 2 + 10)
+  close(costOn(req(1e6, 0, 1e6, 'claude-opus-5'), pricing.claude, 'claude-sonnet-5'), 14)
+  assert.equal(cost(req(1e6, 0, 1e6, 'claude-unknown-9'), pricing.claude), 0)
+})
+
+test('actions: a fresh start after a break, subagents on Sonnet, and the two that save nothing', () => {
+  const hour = 3600e3
+  const main: Session = { agent: 'claude', sub: false, requests: [req(40e3, 0, 1, 'claude-opus-5', 0), req(300e3, 0, 1, 'claude-opus-5', 2 * hour)] }
+  const sub: Session = { agent: 'claude', sub: true, agentType: 'Explore', requests: [req(100e3, 0, 1e3, 'claude-opus-5', 0)] }
+  const report = agentReport('claude', [main, sub])
+  assert.deepEqual(report.actions.map((a) => a.id), ['fresh-after-break', 'subagent-model', 'effort', 'keep-window'])
+  const fresh = report.actions[0]!
+  // 300K written again at 2x, less the 40K base prompt, at $5 per million.
+  assert.ok(Math.abs(fresh.saving - 2 * (300e3 - 40e3) * 5e-6) < 1e-9)
+  assert.equal(report.actions[1]?.facts.topType, 'Explore')
 })
 
 test('compacting at a window cuts modelled cost of a growing session, and a window above it changes nothing', () => {
@@ -79,13 +95,17 @@ test('the report prints no transcript content, project names or paths', () => {
   mkdirSync(join(codexRoot, '2026', '09', '23'), { recursive: true })
   const lines = Array.from({ length: 80 }, (_, i) => claudeLine(`m${i}`, { input_tokens: 1, cache_read_input_tokens: 50e3 + i * 10e3, cache_creation: { ephemeral_1h_input_tokens: 10e3 }, cache_creation_input_tokens: 10e3, output_tokens: 200 }, i === 79 ? 'deepseek-v4-pro:cloud' : 'claude-sonnet-5'))
   writeFileSync(join(claudeRoot, `-home-${MARKER}-project`, `${MARKER}.jsonl`), `${lines.join('\n')}\n`)
+  // A subagent of a custom type, whose name must not be printed.
+  mkdirSync(join(claudeRoot, `-home-${MARKER}-project`, MARKER, 'subagents'), { recursive: true })
+  writeFileSync(join(claudeRoot, `-home-${MARKER}-project`, MARKER, 'subagents', 'agent-a.jsonl'), `${lines.slice(0, 5).map((l) => l.replace('claude-sonnet-5', 'claude-opus-5')).join('\n')}\n`)
+  writeFileSync(join(claudeRoot, `-home-${MARKER}-project`, MARKER, 'subagents', 'agent-a.meta.json'), JSON.stringify({ agentType: `${MARKER}-agent`, description: MARKER }))
   const usages = Array.from({ length: 80 }, (_, i) => ({ input: 50e3 + i * 5e3, cached: 45e3 + i * 5e3, output: 300, total: (i + 1) * 1e6 }))
   writeFileSync(join(codexRoot, '2026', '09', '23', `rollout-${MARKER}.jsonl`), `${codexLines(false, usages).join('\n')}\n`)
   for (const extra of [[], ['--json']]) {
     const run = spawnSync(process.execPath, ['src/cli-report.ts', '--claude-root', claudeRoot, '--codex-root', codexRoot, ...extra], { encoding: 'utf8' })
     assert.equal(run.status, 0, run.stderr)
     assert.match(run.stdout, extra.length ? /"agent": "codex"/ : /Codex: 1 session, 0 subagent transcripts/)
-    assert.match(run.stdout, extra.length ? /"otherModelRequests": 1/ : /Claude Code: 1 session, 0 subagent transcripts, 79 requests/)
+    assert.match(run.stdout, extra.length ? /"otherModelRequests": 1/ : /Claude Code: 1 session, 1 subagent transcript, 84 requests/)
     for (const secret of [MARKER, dir, 'home']) assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false, `output contains ${secret}`)
   }
 })

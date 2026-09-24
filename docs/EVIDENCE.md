@@ -1014,3 +1014,25 @@ where each compaction removes far more; this run does not test that
 regime, so it says nothing either way about compacting at 400K. By the
 reading locked in the protocol, compaction timing is not the lever on this
 evidence, and no boundary trigger (Q9) is built on it.
+
+## Q7: actions in `quench report`, 24 September 2026
+
+The report now prices Claude Code at Anthropic's list prices per model
+(pricing page read 24 September 2026; Fable 5 reads cache at 0.1×, not the
+0.025× of Fable 5.1, which the earlier multipliers had wrong) and ranks
+actions sized from the owner's transcripts. Over 30 days, $12,666 at list
+prices; by model, Opus 5 61%, Fable 5.1 20%, Sonnet 5 6%, Fable 5 6%.
+
+1. **Subagents on Sonnet 5** (price arithmetic; quality not measured):
+   subagents on dearer models cost $2,751 (22%), $2,397 of it
+   general-purpose agents. The same tokens on Sonnet 5 would cost $1,670
+   (13%) less.
+2. **A fresh session after a break** (measured): 168 times a session
+   resumed after its prompt cache expired and wrote its whole context
+   again (median 312K). Starting new work in a fresh session, which writes
+   a 45K base prompt, would have saved up to $614 (5%), if the work was
+   new.
+3. **Effort is not the lever** (measured): thinking is 5% of cost.
+4. **Do not shrink the compaction window** (tested by Quench, Q8).
+
+On Codex, only the last two apply.

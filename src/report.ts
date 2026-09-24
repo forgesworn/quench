@@ -20,6 +20,8 @@ export interface Request {
 export interface Session {
   agent: Agent
   sub: boolean
+  /** A built-in subagent type (general-purpose, Explore, ...), "custom" for any other, or undefined. */
+  agentType?: string
   requests: Request[]
 }
 
@@ -93,31 +95,59 @@ export function codexParser(): LineParser {
   }
 }
 
-/** Multipliers in base-input units. `miss` prices context that must be sent again uncached after a compaction. */
+/**
+ * Multipliers in base-input units, and `scale`, the price of one base-input token for a model: US dollars at list
+ * price for Claude (null for a model without a known price), 1 for Codex, which is reported in units. `miss`
+ * prices context that must be sent again uncached after a compaction.
+ */
 export interface Pricing {
   read(model: string): number
+  scale(model: string): number | null
   write1h: number
   write5m: number
   fresh: number
   out: number
   miss: number
+  currency: 'USD' | 'units'
   note: string
 }
 
+/** Anthropic list prices, read 24 September 2026: base input in US dollars per million tokens, and the cache-read multiplier. */
+const CLAUDE_PRICES: Array<[RegExp, number, number]> = [
+  [/fable-5-1|mythos-5-1/, 10, 0.025],
+  [/fable-5|mythos-5/, 10, 0.1],
+  [/opus-5-5/, 4, 0.05],
+  [/opus-5|opus-4-[5-9]/, 5, 0.1],
+  [/opus-4|opus-3/, 15, 0.1],
+  [/sonnet-5/, 2, 0.1],
+  [/sonnet-4|sonnet-3-7/, 3, 0.1],
+  [/haiku-4-5/, 1, 0.1],
+  [/haiku-3-5/, 0.8, 0.1],
+]
+const claudePrice = (model: string): [number, number] | null => { const hit = CLAUDE_PRICES.find(([re]) => re.test(model)); return hit ? [hit[1], hit[2]] : null }
+export const SONNET_5 = 'claude-sonnet-5'
+
 export const pricing: Record<Agent, Pricing> = {
   claude: {
-    read: (model) => (/opus-5-5/.test(model) ? 0.05 : /fable|mythos/.test(model) ? 0.025 : 0.1),
-    write1h: 2, write5m: 1.25, fresh: 1, out: 5, miss: 2,
-    note: 'cache read 0.1x (Opus 5.5 0.05x, Fable and Mythos 0.025x), one-hour cache write 2x, five-minute 1.25x, output 5x',
+    read: (model) => claudePrice(model)?.[1] ?? 0.1,
+    scale: (model) => { const price = claudePrice(model); return price ? price[0] / 1e6 : null },
+    write1h: 2, write5m: 1.25, fresh: 1, out: 5, miss: 2, currency: 'USD',
+    note: 'Anthropic list prices per model: cache read 0.1x base input (Opus 5.5 0.05x, Fable 5.1 0.025x), one-hour cache write 2x, five-minute 1.25x, output 5x',
   },
   codex: {
-    read: () => 0.1, write1h: 1, write5m: 1, fresh: 1, out: 8, miss: 1,
-    note: 'assumed: cached input 0.1x, no cache-write premium, output 8x (GPT-5 list prices)',
+    read: () => 0.1, scale: () => 1, write1h: 1, write5m: 1, fresh: 1, out: 8, miss: 1, currency: 'units',
+    note: 'assumed multipliers: cached input 0.1x, no cache-write premium, output 8x (the GPT-5 ratios)',
   },
 }
 
-export const parts = (r: Request, p: Pricing) => ({ read: p.read(r.model) * r.read, write: p.write1h * r.write1h + p.write5m * r.write5m + p.fresh * r.fresh, out: p.out * r.out })
+/** A request's cost split by kind, at its model's price (zero for a model without a known price). */
+export const parts = (r: Request, p: Pricing) => {
+  const k = p.scale(r.model) ?? 0
+  return { read: k * p.read(r.model) * r.read, write: k * (p.write1h * r.write1h + p.write5m * r.write5m + p.fresh * r.fresh), out: k * p.out * r.out }
+}
 export const cost = (r: Request, p: Pricing): number => { const x = parts(r, p); return x.read + x.write + x.out }
+/** What the same tokens would cost on another model. */
+export const costOn = (r: Request, p: Pricing, model: string): number => cost({ ...r, model }, p)
 const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0)
 const share = (x: number, total: number): number => (total ? x / total : 0)
 export const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
@@ -175,25 +205,42 @@ export function simulate(s: Session, p: Pricing, compactAt: number | null, summa
       cached = 0
     }
     const hit = Math.min(cached, ctx)
-    modelled += p.read(r.model) * hit + p.miss * (ctx - hit) + p.out * r.out + extra
+    modelled += (p.scale(r.model) ?? 0) * (p.read(r.model) * hit + p.miss * (ctx - hit) + p.out * r.out + extra)
   }
   return modelled
+}
+
+/**
+ * Something the owner can do, sized from their own transcripts. `saving` is in the report's currency (0 for advice
+ * that saves nothing by itself); `evidence` says how far it is known to hold.
+ */
+export interface Action {
+  id: 'fresh-after-break' | 'subagent-model' | 'keep-window' | 'effort'
+  saving: number
+  share: number
+  evidence: 'measured on your transcripts' | 'tested by Quench' | 'price arithmetic; quality not measured'
+  facts: Record<string, number | string>
 }
 
 export interface AgentReport {
   agent: Agent
   pricing: string
+  currency: 'USD' | 'units'
+  total: number
+  unpricedRequests: number
   transcripts: number
   sessions: number
   subagentTranscripts: number
   requests: number
   subagentShare: number
-  components: { cacheReads: number; writesAndFresh: number; output: number; thinkingShareOfOutput: number }
+  byModel: Array<{ model: string; share: number }>
+  components: { cacheReads: number; writesAndFresh: number; output: number; thinkingShareOfOutput: number; thinkingShareOfCost: number }
   bySessionLength: Array<{ from: number; to: number | null; sessions: number; costShare: number }>
   byContext: Array<{ from: number; to: number | null; requestShare: number; costShare: number }>
   compactions: { count: number; medianBefore: number; medianAfter: number; growthAfter: number }
   idleRebuilds: { requests: number; costShare: number; medianContext: number }
   simulation: { summary: number; summaryFrom: 'your compactions' | 'default' | 'set'; windows: Array<{ window: number; costChange: number; costShareAbove: number }> }
+  actions: Action[]
 }
 
 const LENGTHS: Array<[number, number | null]> = [[0, 30], [30, 100], [100, 300], [300, 1000], [1000, null]]
@@ -204,6 +251,7 @@ export function agentReport(agent: Agent, sessions: Session[], summaryOverride?:
   const p = pricing[agent]
   const all = sessions.flatMap((s) => s.requests)
   const main = sessions.filter((s) => !s.sub)
+  const subs = sessions.filter((s) => s.sub)
   const mainRequests = main.flatMap((s) => s.requests)
   const total = sum(all.map((r) => cost(r, p)))
   const mainCost = sum(mainRequests.map((r) => cost(r, p)))
@@ -219,19 +267,51 @@ export function agentReport(agent: Agent, sessions: Session[], summaryOverride?:
     costChange: none ? sum(main.map((s) => simulate(s, p, window, summary))) / none - 1 : 0,
     costShareAbove: share(sum(mainRequests.filter((r) => r.ctx >= window).map((r) => cost(r, p))), mainCost),
   })).filter((w) => w.costShareAbove >= 0.01 && w.window > summary)
+  const byModel = new Map<string, number>()
+  for (const r of all) byModel.set(r.model, (byModel.get(r.model) ?? 0) + cost(r, p))
+  const thinkingCost = sum(all.map((r) => (p.scale(r.model) ?? 0) * p.out * r.think))
+
+  const actions: Action[] = []
+  // After a break longer than the cache lifetime the whole context is written again. For new work, a fresh
+  // session writes only the base prompt (the median first request of a session).
+  const basePrompt = median(main.map((s) => s.requests[0]?.ctx ?? 0))
+  const breakSaving = sum(rebuilt.map((r) => (p.scale(r.model) ?? 0) * p.miss * Math.max(0, r.write1h + r.write5m + r.fresh - basePrompt)))
+  if (share(breakSaving, total) >= 0.01) {
+    actions.push({ id: 'fresh-after-break', saving: breakSaving, share: share(breakSaving, total), evidence: 'measured on your transcripts', facts: { breaks: rebuilt.length, medianContext: median(rebuilt.map((r) => r.ctx)), basePrompt } })
+  }
+  if (agent === 'claude') {
+    // Subagents on models dearer than Sonnet 5, priced again at Sonnet 5 with the same tokens.
+    const premium = subs.flatMap((s) => s.requests.map((r) => ({ r, type: s.agentType ?? 'unknown' }))).filter(({ r }) => cost(r, p) > costOn(r, p, SONNET_5))
+    const subSaving = sum(premium.map(({ r }) => cost(r, p) - costOn(r, p, SONNET_5)))
+    if (share(subSaving, total) >= 0.01) {
+      const byType = new Map<string, number>()
+      for (const { r, type } of premium) byType.set(type, (byType.get(type) ?? 0) + cost(r, p))
+      const [topType, topCost] = [...byType].sort((a, b) => b[1] - a[1])[0] ?? ['unknown', 0]
+      actions.push({ id: 'subagent-model', saving: subSaving, share: share(subSaving, total), evidence: 'price arithmetic; quality not measured', facts: { premiumCost: sum(premium.map(({ r }) => cost(r, p))), premiumShare: share(sum(premium.map(({ r }) => cost(r, p))), total), topType, topTypeCost: topCost } })
+    }
+  }
+  actions.push({ id: 'effort', saving: 0, share: share(thinkingCost, total), evidence: 'measured on your transcripts', facts: {} })
+  actions.push({ id: 'keep-window', saving: 0, share: 0, evidence: 'tested by Quench', facts: {} })
+  actions.sort((a, b) => b.saving - a.saving)
+
   return {
     agent,
     pricing: p.note,
+    currency: p.currency,
+    total,
+    unpricedRequests: all.filter((r) => p.scale(r.model) === null).length,
     transcripts: sessions.length,
     sessions: main.length,
-    subagentTranscripts: sessions.length - main.length,
+    subagentTranscripts: subs.length,
     requests: all.length,
-    subagentShare: share(sum(sessions.filter((s) => s.sub).flatMap((s) => s.requests).map((r) => cost(r, p))), total),
+    subagentShare: share(sum(subs.flatMap((s) => s.requests).map((r) => cost(r, p))), total),
+    byModel: [...byModel].map(([model, c]) => ({ model, share: share(c, total) })).filter((m) => m.share >= 0.005).sort((a, b) => b.share - a.share),
     components: {
       cacheReads: share(sum(all.map((r) => parts(r, p).read)), total),
       writesAndFresh: share(sum(all.map((r) => parts(r, p).write)), total),
       output: share(sum(all.map((r) => parts(r, p).out)), total),
       thinkingShareOfOutput: share(sum(all.map((r) => r.think)), sum(all.map((r) => r.out))),
+      thinkingShareOfCost: share(thinkingCost, total),
     },
     bySessionLength: LENGTHS.map(([from, to]) => {
       const group = main.filter((s) => within(s.requests.length, [from, to]))
@@ -244,5 +324,6 @@ export function agentReport(agent: Agent, sessions: Session[], summaryOverride?:
     compactions: { count: drops.length, medianBefore: median(drops.map((d) => d.before)), medianAfter: median(drops.map((d) => d.after)), growthAfter: median(drops.map((d) => d.growth)) },
     idleRebuilds: { requests: rebuilt.length, costShare: share(sum(rebuilt.map((r) => cost(r, p))), mainCost), medianContext: median(rebuilt.map((r) => r.ctx)) },
     simulation: { summary, summaryFrom: summaryOverride !== undefined ? 'set' : measured !== null ? 'your compactions' : 'default', windows },
+    actions,
   }
 }
