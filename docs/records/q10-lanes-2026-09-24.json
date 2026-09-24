@@ -34,7 +34,7 @@
     },
     "glm-5.3-flash:cloud": {
       "qualified": ["orientation", "diagnosis", "impact", "code change", "dependent chains"],
-      "q5": { "orientation": "6/6", "diagnosis": "5/6", "impact": "6/6", "codeChange": "6/6", "usdPerAccepted": 0.081, "medianSeconds": 306, "codeChangeMedianSeconds": 810 },
+      "q5": { "orientation": "6/6", "diagnosis": "5/6", "impact": "6/6", "codeChange": "6/6", "usdPerAccepted": 0.081, "medianSeconds": 324, "codeChangeMedianSeconds": 810 },
       "chains": { "accepted": "33/36", "usdPerAcceptedStep": 0.057, "minutesPerRun": 14.7 },
       "laneTotalUsd": 3.74
     },

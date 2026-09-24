@@ -1180,7 +1180,7 @@ September 2026.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | DeepSeek V4 Pro (reference) | 24/24 | $0.202 | 135 | 30/36 | $0.125 | 8.6 | $8.58 |
 | DeepSeek V4.1 Flash | 23/24 | $0.036 | 225 | 33/36 | $0.023 | 11.9 | $1.58 |
-| GLM 5.3 Flash | 23/24 | $0.081 | 306 | 33/36 | $0.057 | 14.7 | $3.74 |
+| GLM 5.3 Flash | 23/24 | $0.081 | 324 | 33/36 | $0.057 | 14.7 | $3.74 |
 | Qwen 3.8 on the M4 (two probes only) | 1/2 | no token charge | about 2,350 | not run | | | |
 
 GLM by class: orientation 6, diagnosis 5, impact 6, code change 6 of 6;
