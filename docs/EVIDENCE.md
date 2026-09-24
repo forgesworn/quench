@@ -1036,3 +1036,72 @@ prices; by model, Opus 5 61%, Fable 5.1 20%, Sonnet 5 6%, Fable 5 6%.
 4. **Do not shrink the compaction window** (tested by Quench, Q8).
 
 On Codex, only the last two apply.
+
+## Q7 review: two fresh-eyes reviews and their fixes, 24 September 2026
+
+Two reviewers in fresh sessions, told what the product is but not what the
+evidence says, reviewed the code and the claims. Both were read-only; the
+code reviewer reproduced each finding in a scratch directory.
+
+**Code: four ways the product could damage a setup, all reproduced and
+fixed, each now with a test.**
+
+1. Two copies of the break guard (the plugin hook and a settings hook,
+   which the report suggested to plugin users) deleted each other's mark
+   and blocked nearly every prompt: 29 of 32 raced sends. The mark now
+   records which break was held, a pass never deletes it, the plugin guard
+   is off until the user turns it on, `apply break-guard` refuses when the
+   plugin is enabled, and the report points plugin users to `/config`.
+2. `undo` removed any matching setting: the owner's own subagent model, or
+   another tool's hook ending in `cli.js guard` together with a hook beside
+   it. `apply` now records exactly what it wrote and `undo` removes only
+   that.
+3. A settings file that failed to parse was printed in the error, with any
+   keys in it. The error now names the file only.
+4. `apply` run from the plugin wrote a hook pointing into the plugin cache,
+   which Claude Code deletes after an update. It now refuses there.
+
+Also fixed: the guard held prompts for models with no prompt cache, for
+headless `claude -p` runs and after a compaction; it now holds only a
+cached Claude session idle over an hour, never outside interactive
+Claude Code (`CLAUDE_CODE_ENTRYPOINT`, which is `sdk-cli` under `-p`,
+checked with a blocking hook that made no model call). `--days` counted
+older requests in recent files; `CLAUDE_CONFIG_DIR` was ignored; settings
+were written in place (now atomic, mode kept, three backups); older model
+ids were unpriced; model names outside Claude and OpenAI are no longer
+printed.
+
+**Claims: the product said more than this file supports.** Fixed:
+
+- The tagline promised advice on when to compact; Q8 gives none. Removed.
+- The "do not shrink the window" action quoted the boundary arm's +16% for
+  the threshold arm (+3.6%), hid that the chains disagreed, and was shown
+  to Codex. Withdrawn, with the uncalibrated modelled windows; the report
+  now says compaction gets no advice.
+- The break action was labelled measured. Only the breaks are counted; the
+  saving assumes each began new work. It priced every rewrite at 2× and
+  counted breaks of 50K+ while the guard acts at a higher threshold. It now
+  prices each rewrite at the rate it was written, caps it at the request's
+  cost, and counts only breaks the guard would hold (300K+, over an hour).
+- The subagent saving counted Explore, Plan, forks and custom agents,
+  which `CLAUDE_CODE_SUBAGENT_MODEL` does not move. Only general-purpose
+  subagents now count.
+- "Effort saves at most 5%" is not measured: lower effort can also mean
+  fewer tool calls. Reworded.
+- "Applied" called its figures a measured saving. Renamed "Since applied"
+  and described as a check that a change took effect.
+- A subscription's limits were said to follow token costs, without a
+  source. Removed.
+- Privacy wording now says the plugin puts the report into the Claude
+  conversation.
+
+The research summary moved to `docs/RESEARCH.md` with the reviewer's
+corrections (the 126-session medians, pure gathering against the replay
+figure, the live check's scope, the comparators' truncated snapshots and
+Kev 9B on the Context arm).
+
+**Figures after the fixes** (30 days, the owner's transcripts): $12,586 at
+list prices; general-purpose subagents on Sonnet 5, up to $1,456 (12%),
+with a further $354 on subagents the setting does not move; 89 breaks in
+sessions of 300K+ (median 455K), up to $523 (4%) if each began new work.
+These replace the Q7 actions figures above.

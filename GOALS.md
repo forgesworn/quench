@@ -5,9 +5,9 @@ of a coding agent's session, whether to **stop** gathering evidence or
 **continue**. Q5 and Q6 showed that a stop saves little: agents already stop
 gathering near the right point, and they ignore a stop hint. The cost of a
 coding agent sits in long sessions that resend very large contexts. From Q7
-on, Quench measures that cost from local transcripts and decides when a
-session should compact. The stop decider and its harness stay as the record
-of what was tried.
+on, Quench measures that cost from local transcripts and ranks what could be
+changed. Q8 found no compaction timing worth recommending. The stop decider
+and its harness stay as the record of what was tried.
 
 This is a private, experimental project. No goal below is met until its
 evidence is recorded in `docs/EVIDENCE.md` against a named commit. Claim only
@@ -213,9 +213,12 @@ Q6 did not pass, so the stop hint is not packaged. What is shipped instead:
 
 **Status (24 September 2026):** built and tested, not published. `quench`
 reports ranked actions priced at list prices, applies and undoes the two
-setting changes (`subagent-model`, `break-guard`) with a backup, measures
-spend before and after a change, and ships as a Claude Code plugin
-(validated, loaded in a live session). Publishing waits for the owner.
+setting changes (`subagent-model`, `break-guard`) with a backup, shows
+whether an applied change took effect (not a measured saving), and ships as
+a Claude Code plugin (validated, loaded in a live session) with the break
+guard off by default. Two fresh-eyes reviews and their fixes are recorded in
+`docs/EVIDENCE.md`. No compaction policy is shipped (Q8 not met).
+Publishing waits for the owner.
 
 **Done when:** `quench report` is tested (parsers, pricing, simulation, and a
 test that no transcript content or project name reaches the output), runs

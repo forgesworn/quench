@@ -1,7 +1,10 @@
 # Quench development
 
-Quench decides when a coding agent has gathered enough evidence to stop. It is
-private and experimental; claim nothing that the benchmark has not measured.
+Quench reports where a coding agent's spend goes and applies the setting
+changes the evidence supports. The stop-decider research is its record
+(`docs/RESEARCH.md`). Label every figure by how it is known (measured,
+counted, or modelled from prices) and claim nothing a benchmark has not
+measured.
 
 - Strict TypeScript on Node from `.nvmrc`, run directly with type stripping;
   `npm run check` (typecheck and tests) is the gate.
