@@ -1,0 +1,13 @@
+# Quench
+
+> Local usage and spending diagnostics for Claude Code and Codex, with a Claude Code plugin.
+
+## Documentation
+
+- [Setup and reports](https://github.com/forgesworn/quench/blob/main/README.md): Install from source and inspect the local usage reports.
+
+## ForgeSworn ecosystem
+
+- [ForgeSworn library guide](https://forgesworn.dev/llms.txt): Find related libraries, tools and integration guides by task and runtime.
+- [ForgeSworn on GitHub](https://github.com/forgesworn): Browse the organisation’s public repositories.
+- [Project source](https://github.com/forgesworn/quench): Canonical source repository, documentation and release information.
